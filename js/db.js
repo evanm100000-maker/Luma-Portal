@@ -5,7 +5,7 @@
 
 class LumaDB {
     constructor() {
-        this.STORAGE_KEY = 'luma_oportal_db_v5';
+        this.STORAGE_KEY = 'luma_oportal_production_db';
         this.data = {
             users: [],
             flights: [],
@@ -20,10 +20,25 @@ class LumaDB {
     }
 
     /**
-     * Initialize DB and seed initial data if first time
+     * Initialize DB, restore session, and preserve all user-created data
      */
     async init() {
-        const stored = localStorage.getItem(this.STORAGE_KEY);
+        // Try main persistent storage key first
+        let stored = localStorage.getItem(this.STORAGE_KEY);
+        
+        // Migration check from previous keys if main key is empty
+        if (!stored) {
+            const oldKeys = ['luma_oportal_db_v5', 'luma_oportal_db_v3', 'luma_oportal_db_v1'];
+            for (const key of oldKeys) {
+                const legacy = localStorage.getItem(key);
+                if (legacy) {
+                    stored = legacy;
+                    localStorage.setItem(this.STORAGE_KEY, legacy);
+                    break;
+                }
+            }
+        }
+
         if (stored) {
             try {
                 this.data = JSON.parse(stored);
@@ -35,11 +50,13 @@ class LumaDB {
             await this.seedDefaultData();
         }
 
-        // Check active session
-        const sessionUser = sessionStorage.getItem('luma_active_session');
-        if (sessionUser) {
-            const user = this.data.users.find(u => u.id === sessionUser);
-            if (user) this.currentUser = user;
+        // Restore active user session across refresh / tab close
+        const activeUserId = localStorage.getItem('luma_active_session') || sessionStorage.getItem('luma_active_session');
+        if (activeUserId) {
+            const user = this.data.users.find(u => u.id === activeUserId);
+            if (user) {
+                this.currentUser = user;
+            }
         }
 
         this.processAutoExpiries();
@@ -318,12 +335,14 @@ class LumaDB {
         }
 
         this.currentUser = user;
+        localStorage.setItem('luma_active_session', user.id);
         sessionStorage.setItem('luma_active_session', user.id);
         return user;
     }
 
     logout() {
         this.currentUser = null;
+        localStorage.removeItem('luma_active_session');
         sessionStorage.removeItem('luma_active_session');
     }
 
