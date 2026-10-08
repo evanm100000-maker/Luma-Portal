@@ -202,39 +202,21 @@ class LumaApp {
 
             modal.classList.remove('hidden');
 
-            // Play looping alarm sound MP3
-            const audioEl = document.getElementById('emergency-alarm-audio');
-            if (audioEl) {
-                audioEl.currentTime = 0;
-                audioEl.loop = true;
-                const playPromise = audioEl.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(err => {
-                        console.warn("Audio autoplay blocked by browser policy, starting Web Audio synth fallback:", err);
-                        this.startEmergencySynthAlarm();
-                    });
-                }
-            }
+            // Play Web Audio Emergency Siren Alarm sound loop continuously
+            this.startEmergencySynthAlarm();
         } else {
             this.dismissEmergencyAlert(false);
         }
     }
 
     /**
-     * Dismiss Emergency Alert & Stop Sound Loop
+     * Dismiss Emergency Alert & Stop Siren Sound Loop
      */
     dismissEmergencyAlert(isUserClick = true) {
         const modal = document.getElementById('modal-emergency-alert');
         if (modal) modal.classList.add('hidden');
 
-        // Stop audio element
-        const audioEl = document.getElementById('emergency-alarm-audio');
-        if (audioEl) {
-            audioEl.pause();
-            audioEl.currentTime = 0;
-        }
-
-        // Stop synth oscillator if running
+        // Stop Emergency Siren Oscillator Loop
         if (this.synthOscillator) {
             try { this.synthOscillator.stop(); } catch (e) {}
             this.synthOscillator = null;
@@ -242,6 +224,10 @@ class LumaApp {
         if (this.synthInterval) {
             clearInterval(this.synthInterval);
             this.synthInterval = null;
+        }
+        if (this.synthAudioContext) {
+            try { this.synthAudioContext.close(); } catch (e) {}
+            this.synthAudioContext = null;
         }
 
         // If admin clicked dismiss, offer option to clear globally
@@ -263,33 +249,43 @@ class LumaApp {
     }
 
     /**
-     * Web Audio API Emergency Siren Synth Fallback
+     * Web Audio API Emergency Siren Alarm Sound Generator (Continuous Dual-Tone Siren)
      */
     startEmergencySynthAlarm() {
+        // Stop any existing siren instance first
+        if (this.synthOscillator) {
+            try { this.synthOscillator.stop(); } catch (e) {}
+        }
+        if (this.synthInterval) {
+            clearInterval(this.synthInterval);
+        }
+
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.synthAudioContext = ctx;
+
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
 
             osc.type = 'sawtooth';
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.setValueAtTime(0.35, ctx.currentTime);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
 
             let high = false;
-            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.frequency.setValueAtTime(900, ctx.currentTime);
             osc.start();
 
             this.synthOscillator = osc;
             this.synthInterval = setInterval(() => {
                 high = !high;
-                if (osc && ctx) {
-                    osc.frequency.setValueAtTime(high ? 950 : 650, ctx.currentTime);
+                if (osc && ctx && ctx.state === 'running') {
+                    osc.frequency.setValueAtTime(high ? 980 : 620, ctx.currentTime);
                 }
-            }, 300);
+            }, 250);
         } catch (e) {
-            console.error("Audio synth error:", e);
+            console.error("Emergency siren audio error:", e);
         }
     }
 

@@ -108,22 +108,23 @@ class LumaDB {
 
                 this.fbDB = firebase.database();
 
-                // Realtime State Sync Listener (No refresh needed)
+                // Realtime State Sync Listener (Merge without data loss)
                 this.fbDB.ref('portal_state').on('value', (snapshot) => {
                     const cloudData = snapshot.val();
                     if (cloudData && typeof cloudData === 'object') {
-                        // Deep merge cloud data
+                        // Safe merge: Preserve both local & cloud records by ID
                         this.data = {
                             ...this.data,
                             ...cloudData,
-                            users: cloudData.users || this.data.users,
-                            flights: cloudData.flights || this.data.flights,
-                            allocations: cloudData.allocations || this.data.allocations,
-                            loaRequests: cloudData.loaRequests || this.data.loaRequests,
-                            consequences: cloudData.consequences || this.data.consequences,
-                            reports: cloudData.reports || this.data.reports,
-                            supportTickets: cloudData.supportTickets || this.data.supportTickets
+                            users: this.mergeArraysById(this.data.users, cloudData.users),
+                            flights: this.mergeArraysById(this.data.flights, cloudData.flights),
+                            allocations: this.mergeArraysById(this.data.allocations, cloudData.allocations),
+                            loaRequests: this.mergeArraysById(this.data.loaRequests, cloudData.loaRequests),
+                            consequences: this.mergeArraysById(this.data.consequences, cloudData.consequences),
+                            reports: this.mergeArraysById(this.data.reports, cloudData.reports),
+                            supportTickets: this.mergeArraysById(this.data.supportTickets, cloudData.supportTickets)
                         };
+
                         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
                         
                         // Re-verify current session user
@@ -155,43 +156,54 @@ class LumaDB {
     }
 
     /**
-     * Seed initial required Founder account (No placeholders)
+     * Merge items by ID ensuring no user, flight, or record is ever deleted during sync
+     */
+    mergeArraysById(localArr = [], cloudArr = []) {
+        const map = new Map();
+        (localArr || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+        (cloudArr || []).forEach(item => {
+            if (item && item.id) {
+                const existing = map.get(item.id);
+                map.set(item.id, existing ? { ...existing, ...item } : item);
+            }
+        });
+        return Array.from(map.values());
+    }
+
+    /**
+     * Seed initial required Founder account (Never overwrites existing users)
      */
     async seedDefaultData() {
-        // Hash founder password "MICHELLE11."
-        const founderPassHash = await CryptoUtils.hashPassword('MICHELLE11.');
+        if (!this.data) {
+            this.data = { users: [], flights: [], allocations: [], loaRequests: [], consequences: [], reports: [], supportTickets: [], firebaseConfig: null };
+        }
+        if (!this.data.users) this.data.users = [];
 
-        const now = new Date();
+        const founderEmail = 'evanm.100000@gmail.com';
+        let founder = this.data.users.find(u => u.email.toLowerCase() === founderEmail);
 
-        this.data = {
-            users: [
-                {
-                    id: 'usr_founder_01',
-                    preferredName: 'Evan',
-                    robloxUser: 'JAMIE',
-                    discordUser: 'HAPPYEVBEV',
-                    email: 'evanm.100000@gmail.com',
-                    passwordHash: founderPassHash,
-                    role: 'Head Admin', // Head Admin, Admin, Senior Staff, Staff
-                    status: 'Approved', // Pending, Approved, Rejected, Suspended
-                    joinedDate: now.toISOString(),
-                    praisePoints: 0,
-                    flightsAttended: 0,
-                    weeklyStats: [0, 0, 0, 0, 0],
-                    activityStatus: 'Normal', // Normal, LOA, Reduced Activity
-                    loaUntil: null,
-                    suspensionUntil: null,
-                    suspensionReason: null
-                }
-            ],
-            flights: [],
-            allocations: [],
-            loaRequests: [],
-            consequences: [],
-            reports: [],
-            supportTickets: [],
-            firebaseConfig: null
-        };
+        if (!founder) {
+            const founderPassHash = await CryptoUtils.hashPassword('MICHELLE11.');
+            founder = {
+                id: 'usr_founder_01',
+                preferredName: 'Evan',
+                robloxUser: 'JAMIE',
+                discordUser: 'HAPPYEVBEV',
+                email: founderEmail,
+                passwordHash: founderPassHash,
+                role: 'Head Admin',
+                status: 'Approved',
+                joinedDate: new Date().toISOString(),
+                praisePoints: 0,
+                flightsAttended: 0,
+                weeklyStats: [0, 0, 0, 0, 0],
+                activityStatus: 'Normal',
+                loaUntil: null,
+                suspensionUntil: null,
+                suspensionReason: null
+            };
+            this.data.users.push(founder);
+        }
     }
 
     /**
