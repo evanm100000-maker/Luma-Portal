@@ -123,9 +123,18 @@ class LumaApp {
      * Triggered automatically by Firebase Realtime Database on any cloud state change
      * Ensures full site is constantly up to date without page refresh!
      */
+    /**
+     * Triggered automatically by Firebase Realtime Database on any cloud state change
+     * Ensures full site is constantly up to date without page refresh!
+     */
     onRealtimeSync() {
         if (!db.currentUser) return;
         this.renderNavUserBadges(db.currentUser);
+
+        // Check active Emergency Alert in state
+        if (db.data && db.data.activeEmergencyAlert && db.data.activeEmergencyAlert.active !== false) {
+            this.onEmergencyAlertReceived(db.data.activeEmergencyAlert);
+        }
 
         // Update active screen elements dynamically
         const activeScreenId = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin']
@@ -154,26 +163,33 @@ class LumaApp {
      */
     promptEmergencyAlert() {
         const user = db.currentUser;
-        if (!['Head Admin', 'Admin'].includes(user.role)) return;
+        if (!['Head Admin', 'Admin'].includes(user.role)) {
+            Swal.fire('Access Denied', 'Admin privileges required to issue Emergency Alerts.', 'error');
+            return;
+        }
 
         Swal.fire({
             title: '🚨 Dispatch Emergency Alert',
-            text: 'Type emergency broadcast message. This will immediately trigger an alarming popup sound on ALL staff screens:',
+            text: 'Enter emergency broadcast message. This will IMMEDIATELY trigger an alarming popup sound on ALL staff screens:',
             input: 'textarea',
-            inputPlaceholder: 'ATTENTION ALL CREW: Report to Airport Security immediately...',
+            inputPlaceholder: 'ATTENTION ALL CREW: Flight LM-101 moved to Gate 4. Report immediately...',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             confirmButtonText: 'BROADCAST EMERGENCY ALERT'
         }).then(result => {
             if (result.isConfirmed && result.value && result.value.trim()) {
                 const alertObj = db.broadcastEmergencyAlert(result.value.trim(), `${user.preferredName} (${user.role})`);
-                Swal.fire('Broadcast Dispatched!', 'Emergency Alert sent to all staff members.', 'success');
+                
+                // Immediately trigger locally & across network
+                this.onEmergencyAlertReceived(alertObj);
+
+                Swal.fire('Broadcast Dispatched!', 'Emergency Alert sent to all staff members in real time.', 'success');
             }
         });
     }
 
     /**
-     * Triggered when an Emergency Alert is received (Real-time Firebase Event)
+     * Triggered when an Emergency Alert is received (Real-time Firebase Event & Local Dispatch)
      */
     onEmergencyAlertReceived(alertData) {
         const modal = document.getElementById('modal-emergency-alert');
