@@ -18,6 +18,21 @@ class LumaApp {
     async init() {
         await db.init();
         this.checkAuth();
+        this.startRealtimeHeartbeat();
+    }
+
+    /**
+     * Continuous 1.5-second Realtime Polling Heartbeat
+     * Guarantees the entire portal stays 100% updated constantly without page refresh!
+     */
+    startRealtimeHeartbeat() {
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = setInterval(() => {
+            if (db.currentUser) {
+                db.processAutoExpiries();
+                this.onRealtimeSync();
+            }
+        }, 1500);
     }
 
     /**

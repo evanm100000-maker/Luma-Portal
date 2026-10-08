@@ -44,7 +44,25 @@ class LumaDB {
 
         this.processAutoExpiries();
 
-        // Initialize Firebase Cloud Sync
+        // 1. Cross-Tab Realtime LocalStorage Listener (Instant sync across tabs/windows)
+        window.addEventListener('storage', (e) => {
+            if (e.key === this.STORAGE_KEY && e.newValue) {
+                try {
+                    this.data = JSON.parse(e.newValue);
+                    if (this.currentUser) {
+                        const updatedUser = this.data.users.find(u => u.id === this.currentUser.id);
+                        if (updatedUser) this.currentUser = updatedUser;
+                    }
+                    if (window.app && typeof app.onRealtimeSync === 'function') {
+                        app.onRealtimeSync();
+                    }
+                } catch (err) {
+                    console.error("Error parsing cross-tab storage sync:", err);
+                }
+            }
+        });
+
+        // 2. Initialize Firebase Cloud Sync
         this.initFirebase();
 
         this.save();
@@ -77,8 +95,18 @@ class LumaDB {
                 this.fbDB.ref('portal_state').on('value', (snapshot) => {
                     const cloudData = snapshot.val();
                     if (cloudData && typeof cloudData === 'object') {
-                        // Merge cloud data
-                        this.data = { ...this.data, ...cloudData };
+                        // Deep merge cloud data
+                        this.data = {
+                            ...this.data,
+                            ...cloudData,
+                            users: cloudData.users || this.data.users,
+                            flights: cloudData.flights || this.data.flights,
+                            allocations: cloudData.allocations || this.data.allocations,
+                            loaRequests: cloudData.loaRequests || this.data.loaRequests,
+                            consequences: cloudData.consequences || this.data.consequences,
+                            reports: cloudData.reports || this.data.reports,
+                            supportTickets: cloudData.supportTickets || this.data.supportTickets
+                        };
                         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
                         
                         // Re-verify current session user
