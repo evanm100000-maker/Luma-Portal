@@ -127,6 +127,32 @@ class LumaApp {
      * Triggered automatically by Firebase Realtime Database on any cloud state change
      * Ensures full site is constantly up to date without page refresh!
      */
+    getDismissedAlertIds() {
+        try {
+            const stored = localStorage.getItem('luma_dismissed_alert_ids');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    markAlertDismissedLocally(alertId) {
+        if (!alertId) return;
+        try {
+            const ids = this.getDismissedAlertIds();
+            if (!ids.includes(alertId)) {
+                ids.push(alertId);
+                localStorage.setItem('luma_dismissed_alert_ids', JSON.stringify(ids));
+            }
+        } catch (e) {}
+    }
+
+    isAlertDismissedLocally(alertId) {
+        if (!alertId) return false;
+        const ids = this.getDismissedAlertIds();
+        return ids.includes(alertId);
+    }
+
     onRealtimeSync() {
         if (!db.currentUser) return;
         this.renderNavUserBadges(db.currentUser);
@@ -134,6 +160,11 @@ class LumaApp {
         // Check active Emergency Alert in state
         if (db.data && db.data.activeEmergencyAlert && db.data.activeEmergencyAlert.active !== false) {
             this.onEmergencyAlertReceived(db.data.activeEmergencyAlert);
+        } else {
+            const modal = document.getElementById('modal-emergency-alert');
+            if (modal && !modal.classList.contains('hidden')) {
+                this.dismissEmergencyAlert(false);
+            }
         }
 
         // Update active screen elements dynamically
@@ -196,6 +227,15 @@ class LumaApp {
         if (!modal) return;
 
         if (alertData && alertData.active !== false && alertData.message) {
+            this.currentActiveAlertId = alertData.id;
+
+            // If alert has ALREADY been dismissed on this device, do NOT show modal or play siren!
+            if (alertData.id && this.isAlertDismissedLocally(alertData.id)) {
+                this.stopEmergencySynthAlarm();
+                modal.classList.add('hidden');
+                return;
+            }
+
             document.getElementById('emergency-alert-text').textContent = alertData.message;
             document.getElementById('emergency-alert-sender').textContent = `Issued by: ${alertData.senderName || 'Command Center'}`;
             document.getElementById('emergency-alert-time').textContent = `Broadcasted: ${alertData.time || 'Just now'}`;
@@ -203,20 +243,18 @@ class LumaApp {
             modal.classList.remove('hidden');
 
             // Play Web Audio Emergency Siren Alarm sound loop continuously
-            this.startEmergencySynthAlarm();
+            if (!this.synthOscillator) {
+                this.startEmergencySynthAlarm();
+            }
         } else {
             this.dismissEmergencyAlert(false);
         }
     }
 
     /**
-     * Dismiss Emergency Alert & Stop Siren Sound Loop
+     * Stop Emergency Siren Oscillator Loop & AudioContext safely
      */
-    dismissEmergencyAlert(isUserClick = true) {
-        const modal = document.getElementById('modal-emergency-alert');
-        if (modal) modal.classList.add('hidden');
-
-        // Stop Emergency Siren Oscillator Loop
+    stopEmergencySynthAlarm() {
         if (this.synthOscillator) {
             try { this.synthOscillator.stop(); } catch (e) {}
             this.synthOscillator = null;
@@ -229,22 +267,25 @@ class LumaApp {
             try { this.synthAudioContext.close(); } catch (e) {}
             this.synthAudioContext = null;
         }
+    }
 
-        // If admin clicked dismiss, offer option to clear globally
-        if (isUserClick && db.currentUser && ['Head Admin', 'Admin'].includes(db.currentUser.role)) {
-            Swal.fire({
-                title: 'Clear Global Emergency Alert?',
-                text: 'Would you like to deactivate this Emergency Alert globally for all other staff members?',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Clear Alert Globally',
-                cancelButtonText: 'Keep Active For Others',
-                confirmButtonColor: '#ef4444'
-            }).then(result => {
-                if (result.isConfirmed) {
-                    db.clearEmergencyAlert();
-                    Swal.fire('Alert Cleared', 'Emergency alert deactivated across all devices.', 'success');
-                }
-            });
+    /**
+     * Dismiss Emergency Alert & Stop Siren Sound Loop
+     */
+    dismissEmergencyAlert(isUserClick = true) {
+        const modal = document.getElementById('modal-emergency-alert');
+        if (modal) modal.classList.add('hidden');
+
+        this.stopEmergencySynthAlarm();
+
+        const activeId = this.currentActiveAlertId || (db.data && db.data.activeEmergencyAlert && db.data.activeEmergencyAlert.id);
+        if (activeId) {
+            this.markAlertDismissedLocally(activeId);
+        }
+
+        // When cleared/dismissed by user on device, delete alert globally for all devices immediately
+        if (isUserClick) {
+            db.clearEmergencyAlert();
         }
     }
 

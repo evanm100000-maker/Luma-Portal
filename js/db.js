@@ -143,6 +143,8 @@ class LumaDB {
                 // Emergency Alert Realtime Listener
                 this.fbDB.ref('emergency_alert').on('value', (snapshot) => {
                     const alertData = snapshot.val();
+                    this.data.activeEmergencyAlert = alertData || null;
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
                     if (window.app && typeof app.onEmergencyAlertReceived === 'function') {
                         app.onEmergencyAlertReceived(alertData);
                     }
@@ -275,7 +277,12 @@ class LumaDB {
 
     clearEmergencyAlert() {
         if (this.fbDB) {
-            this.fbDB.ref('emergency_alert').set(null);
+            try {
+                this.fbDB.ref('emergency_alert').set(null);
+                this.fbDB.ref('portal_state/activeEmergencyAlert').set(null);
+            } catch (err) {
+                console.warn("Firebase clear alert notice:", err.message);
+            }
         }
         this.data.activeEmergencyAlert = null;
         this.save();
