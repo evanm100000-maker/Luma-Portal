@@ -155,6 +155,13 @@ class LumaApp {
 
     onRealtimeSync() {
         if (!db.currentUser) return;
+
+        // Immediate Realtime Account Lockout Enforcement for Suspended Users
+        if (db.currentUser.status === 'Suspended') {
+            this.showSuspensionScreen(db.currentUser);
+            return;
+        }
+
         this.renderNavUserBadges(db.currentUser);
 
         // Check active Emergency Alert in state
@@ -467,12 +474,22 @@ class LumaApp {
      */
     showSuspensionScreen(user) {
         this.hideAllPages();
-        document.getElementById('suspension-screen').classList.remove('hidden');
+        const topNav = document.getElementById('top-navbar');
+        if (topNav) topNav.classList.remove('hidden');
+
+        const authScreen = document.getElementById('auth-screen');
+        if (authScreen) authScreen.classList.add('hidden');
+
+        const suspensionScreen = document.getElementById('suspension-screen');
+        if (suspensionScreen) suspensionScreen.classList.remove('hidden');
 
         const timerEl = document.getElementById('suspension-timer');
         if (this.suspensionTimerInterval) clearInterval(this.suspensionTimerInterval);
 
-        const expiryMs = new Date(user.suspensionUntil).getTime();
+        let expiryMs = user.suspensionUntil ? new Date(user.suspensionUntil).getTime() : NaN;
+        if (isNaN(expiryMs)) {
+            expiryMs = Date.now() + 48 * 3600 * 1000; // Fallback 48 hours
+        }
 
         const updateTimer = () => {
             const nowMs = Date.now();
@@ -491,7 +508,9 @@ class LumaApp {
             const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
-            timerEl.textContent = `${days.toString().padStart(2, '0')}d ${hours.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+            if (timerEl) {
+                timerEl.textContent = `${days.toString().padStart(2, '0')}d ${hours.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+            }
         };
 
         updateTimer();
@@ -1308,7 +1327,9 @@ class LumaApp {
         if (!select) return;
 
         const approvedUsers = db.data.users.filter(u => u.status === 'Approved' || u.status === 'Suspended');
-        select.innerHTML = approvedUsers.map(u => `<option value="${u.id}">${u.preferredName} (${u.robloxUser}) - ${u.email}</option>`).join('');
+        let html = `<option value="" disabled selected>-- Select Target Staff Member --</option>`;
+        html += approvedUsers.map(u => `<option value="${u.id}">${u.preferredName} (${u.robloxUser}) - ${u.email}</option>`).join('');
+        select.innerHTML = html;
         this.toggleAdminLogFields();
     }
 
@@ -1334,6 +1355,11 @@ class LumaApp {
     handleAdminLogConsequence(e) {
         e.preventDefault();
         const userId = document.getElementById('admin-log-target-user').value;
+        if (!userId) {
+            Swal.fire('Target Staff Required', 'Please select a target staff member from the dropdown.', 'error');
+            return;
+        }
+
         const level = document.getElementById('admin-log-level').value;
         const reason = document.getElementById('admin-log-reason').value;
         const c4Date = document.getElementById('admin-log-c4-date').value;
@@ -1343,18 +1369,25 @@ class LumaApp {
 
         const adminUser = db.currentUser;
 
-        db.assignConsequence({
+        const res = db.assignConsequence({
             userId,
             level,
             reason,
-            issuedBy: `${adminUser.preferredName} (${adminUser.robloxUser})`,
+            issuedBy: `${adminUser.preferredName} (${adminUser.role})`,
             c4Date,
             c4Time,
             c4Location,
             c5DurationHours
         });
 
-        Swal.fire('Consequence Logged!', `Level ${level} action successfully logged for staff member.`, 'warning');
+        if (res && res.targetUser) {
+            Swal.fire(
+                'Consequence Logged!',
+                `Level ${level} action assigned to ${res.targetUser.preferredName} (${res.targetUser.robloxUser}).${level === 'C5' ? ' Account has been LOCKED OUT.' : ''}`,
+                level === 'C5' ? 'error' : 'warning'
+            );
+        }
+
         e.target.reset();
         this.renderAdminPanel();
     }
@@ -1409,17 +1442,23 @@ class LumaApp {
         container.innerHTML = approvedUsers.map(u => `
             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <h4 class="text-sm font-bold text-white">${u.preferredName} (${u.robloxUser})</h4>
                         <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
                             u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
                         }">${u.role}</span>
-                        ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded">SUSPENDED</span>' : ''}
+                        ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> SUSPENDED</span>' : ''}
                     </div>
                     <p class="text-xs text-slate-400 mt-1">Discord: ${u.discordUser} | Email: ${u.email}</p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    ${u.status === 'Suspended' ? `
+                        <button onclick="app.liftStaffSuspension('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow">
+                            <i class="fa-solid fa-unlock mr-1"></i> Lift Suspension
+                        </button>
+                    ` : ''}
+
                     <!-- Promote / Demote Button -->
                     <button onclick="app.promptPromotionPassword('${u.id}', '${u.role === 'Admin' ? 'Staff' : 'Admin'}')" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-bold rounded-lg transition-all">
                         <i class="fa-solid fa-key mr-1"></i> ${u.role === 'Admin' ? 'Demote to Staff' : 'Promote to Admin'}
@@ -1437,6 +1476,12 @@ class LumaApp {
                 </div>
             </div>
         `).join('');
+    }
+
+    liftStaffSuspension(userId) {
+        db.removeSuspension(userId);
+        Swal.fire('Suspension Lifted!', 'User account status restored to Approved.', 'success');
+        this.renderAdminPanel();
     }
 
     /**
@@ -1518,6 +1563,11 @@ class LumaApp {
     handleAssignConsequence(e) {
         e.preventDefault();
         const userId = document.getElementById('consequence-target-user-id').value;
+        if (!userId) {
+            Swal.fire('Error', 'No target staff member selected.', 'error');
+            return;
+        }
+
         const level = document.getElementById('consequence-level').value;
         const reason = document.getElementById('consequence-reason').value;
         const c4Date = document.getElementById('c4-date').value;
@@ -1527,11 +1577,11 @@ class LumaApp {
 
         const adminUser = db.currentUser;
 
-        db.assignConsequence({
+        const res = db.assignConsequence({
             userId,
             level,
             reason,
-            issuedBy: `${adminUser.preferredName} (${adminUser.robloxUser})`,
+            issuedBy: `${adminUser.preferredName} (${adminUser.role})`,
             c4Date,
             c4Time,
             c4Location,
@@ -1540,7 +1590,15 @@ class LumaApp {
 
         document.getElementById('modal-give-consequence').classList.add('hidden');
         e.target.reset();
-        Swal.fire('Consequence Issued!', `Level ${level} action assigned to user.`, 'warning');
+
+        if (res && res.targetUser) {
+            Swal.fire(
+                'Consequence Issued!',
+                `Level ${level} action assigned to ${res.targetUser.preferredName} (${res.targetUser.robloxUser}).${level === 'C5' ? ' User account has been LOCKED OUT.' : ''}`,
+                level === 'C5' ? 'error' : 'warning'
+            );
+        }
+
         this.renderAdminPanel();
     }
 

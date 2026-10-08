@@ -493,15 +493,16 @@ class LumaDB {
     // --- CONSEQUENCES & SUSPENSIONS ---
 
     assignConsequence(cData) {
+        if (!cData || !cData.userId) return null;
         const user = this.data.users.find(u => u.id === cData.userId);
-        if (!user) return;
+        if (!user) return null;
 
         const newConsequence = {
             id: 'csq_' + Date.now(),
             userId: cData.userId,
             userName: user.preferredName + ' (' + user.robloxUser + ')',
             level: cData.level, // C1, C2, C3, C4A, C4B, C5
-            reason: cData.reason,
+            reason: cData.reason || 'No reason specified',
             issuedBy: cData.issuedBy,
             issuedDate: new Date().toISOString().split('T')[0],
             c4Date: cData.c4Date || null,
@@ -511,13 +512,14 @@ class LumaDB {
             c5DurationHours: cData.c5DurationHours || null
         };
 
-        // Handle C5 Suspension
+        // Handle C5 Suspension (Account Lockout)
         if (cData.level === 'C5') {
-            const durationHours = parseInt(cData.c5DurationHours || 48); // default 48h = 2 days
+            const parsed = parseInt(cData.c5DurationHours);
+            const durationHours = (!isNaN(parsed) && parsed > 0) ? parsed : 48; // default 48h = 2 days
             const suspensionExpiry = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
             user.status = 'Suspended';
             user.suspensionUntil = suspensionExpiry;
-            user.suspensionReason = cData.reason;
+            user.suspensionReason = cData.reason || 'C5 Suspension Action Issued';
         }
 
         this.data.consequences.push(newConsequence);
