@@ -5,7 +5,7 @@
 
 class LumaDB {
     constructor() {
-        this.STORAGE_KEY = 'luma_oportal_db_v3';
+        this.STORAGE_KEY = 'luma_oportal_db_v5';
         this.data = {
             users: [],
             flights: [],
@@ -138,7 +138,7 @@ class LumaDB {
     }
 
     /**
-     * Seed initial required Founder & demo dataset
+     * Seed initial required Founder account (No placeholders)
      */
     async seedDefaultData() {
         // Hash founder password "MICHELLE11."
@@ -157,188 +157,22 @@ class LumaDB {
                     passwordHash: founderPassHash,
                     role: 'Head Admin', // Head Admin, Admin, Senior Staff, Staff
                     status: 'Approved', // Pending, Approved, Rejected, Suspended
-                    joinedDate: new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000).toISOString(),
-                    praisePoints: 150,
-                    flightsAttended: 18,
-                    weeklyStats: [3, 4, 5, 2, 4], // 5 weeks of flight activity
-                    activityStatus: 'Normal', // Normal, LOA, Reduced Activity
-                    loaUntil: null,
-                    suspensionUntil: null,
-                    suspensionReason: null
-                },
-                {
-                    id: 'usr_demo_02',
-                    preferredName: 'Alex Crew',
-                    robloxUser: 'AlexSkyLine',
-                    discordUser: 'Alex_Staff#1234',
-                    email: 'alex@luma.com',
-                    passwordHash: await CryptoUtils.hashPassword('staff123'),
-                    role: 'Staff',
-                    status: 'Approved',
-                    joinedDate: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-                    praisePoints: 45,
-                    flightsAttended: 6,
-                    weeklyStats: [1, 2, 1, 2, 0],
-                    activityStatus: 'Normal',
-                    loaUntil: null,
-                    suspensionUntil: null
-                },
-                {
-                    id: 'usr_pending_03',
-                    preferredName: 'Jordan Pilot',
-                    robloxUser: 'JordanAviation',
-                    discordUser: 'JordanFly',
-                    email: 'jordan.applicant@gmail.com',
-                    passwordHash: await CryptoUtils.hashPassword('applicant123'),
-                    role: 'Staff',
-                    status: 'Pending',
                     joinedDate: now.toISOString(),
                     praisePoints: 0,
                     flightsAttended: 0,
                     weeklyStats: [0, 0, 0, 0, 0],
-                    activityStatus: 'Normal',
-                    loaUntil: null
+                    activityStatus: 'Normal', // Normal, LOA, Reduced Activity
+                    loaUntil: null,
+                    suspensionUntil: null,
+                    suspensionReason: null
                 }
             ],
-
-            flights: [
-                {
-                    id: 'flt_101',
-                    code: 'LM-101',
-                    host: 'JAMIE',
-                    aircraft: 'Airbus A320neo',
-                    airport: 'Luma International Airport (Hub A)',
-                    airportLink: 'https://www.roblox.com/games/123456789/Luma-Airport',
-                    date: this.getRelativeDateStr(0), // Today
-                    time: '18:00',
-                    createdDate: now.toISOString()
-                },
-                {
-                    id: 'flt_102',
-                    code: 'LM-204',
-                    host: 'JAMIE',
-                    aircraft: 'Boeing 787-9 Dreamliner',
-                    airport: 'St. Lucia Regional Airport',
-                    airportLink: 'https://www.roblox.com/games/987654321/St-Lucia-Airport',
-                    date: this.getRelativeDateStr(2), // 2 days from now
-                    time: '20:30',
-                    createdDate: now.toISOString()
-                },
-                {
-                    id: 'flt_103',
-                    code: 'LM-305',
-                    host: 'AlexSkyLine',
-                    aircraft: 'ATR 72-600',
-                    airport: 'Isle of Luma Executive Airfield',
-                    airportLink: 'https://www.roblox.com/games/555555555/Airfield',
-                    date: this.getRelativeDateStr(5), // 5 days from now
-                    time: '16:00',
-                    createdDate: now.toISOString()
-                }
-            ],
-
-            allocations: [
-                {
-                    id: 'alloc_01',
-                    flightId: 'flt_101',
-                    userId: 'usr_founder_01',
-                    userName: 'Evan (JAMIE)',
-                    status: 'Attending', // Attending, Unsure, Absent
-                    role: 'Captain', // Cabin crew, Ground crew, First officer, Captain, Security, Other
-                    reason: ''
-                },
-                {
-                    id: 'alloc_02',
-                    flightId: 'flt_101',
-                    userId: 'usr_demo_02',
-                    userName: 'Alex Crew (AlexSkyLine)',
-                    status: 'Attending',
-                    role: 'Cabin crew',
-                    reason: ''
-                }
-            ],
-
-            loaRequests: [
-                {
-                    id: 'loa_01',
-                    userId: 'usr_demo_02',
-                    userName: 'Alex Crew',
-                    type: 'Reduced Activity', // LOA or Reduced Activity
-                    startDate: this.getRelativeDateStr(-3),
-                    endDate: this.getRelativeDateStr(7),
-                    reason: 'School exam preparations',
-                    status: 'Approved', // Pending, Approved, Rejected
-                    submittedDate: now.toISOString()
-                }
-            ],
-
-            consequences: [
-                {
-                    id: 'csq_01',
-                    userId: 'usr_demo_02',
-                    userName: 'Alex Crew',
-                    level: 'C1', // C1, C2, C3, C4A, C4B, C5
-                    reason: 'Tardiness for flight LM-090 briefing',
-                    issuedBy: 'JAMIE (Head Admin)',
-                    issuedDate: this.getRelativeDateStr(-10),
-                    c4Date: null,
-                    c4Time: null,
-                    c4Location: null,
-                    c5DurationHours: null
-                }
-            ],
-
-            reports: [
-                {
-                    id: 'rep_01',
-                    reporterId: 'usr_demo_02',
-                    reporterName: 'Alex Crew',
-                    targetUser: 'GrieferPlayer99',
-                    offense: 'Disruption / Griefing',
-                    description: 'Player continuously walked on runway and ignored security warnings.',
-                    imageUrl: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=500&q=80',
-                    status: 'Processing', // Processing, In review, Closed
-                    submittedDate: this.getRelativeDateStr(-1),
-                    replies: [
-                        {
-                            author: 'JAMIE (Head Admin)',
-                            message: 'Thank you for reporting. Reviewing footage from host logs.',
-                            date: new Date().toISOString()
-                        }
-                    ]
-                }
-            ],
-
-            supportTickets: [
-                {
-                    id: 'tkt_01',
-                    creatorId: 'usr_demo_02',
-                    creatorName: 'Alex Crew',
-                    subject: 'Calendar allocation sync issue',
-                    category: 'Bug Report',
-                    status: 'Open', // Open, Escalated, Closed
-                    assignedAdminId: 'usr_founder_01',
-                    assignedAdminName: 'Evan (JAMIE)',
-                    createdDate: this.getRelativeDateStr(-1),
-                    messages: [
-                        {
-                            senderId: 'usr_demo_02',
-                            senderName: 'Alex Crew',
-                            role: 'Staff',
-                            text: 'Hello, when I select Unsure it showed present on my dashboard.',
-                            timestamp: new Date(now.getTime() - 2 * 3600 * 1000).toISOString()
-                        },
-                        {
-                            senderId: 'usr_founder_01',
-                            senderName: 'Evan (JAMIE)',
-                            role: 'Head Admin',
-                            text: 'Hey Alex, checking this out right now! Thanks for flagging.',
-                            timestamp: new Date(now.getTime() - 1 * 3600 * 1000).toISOString()
-                        }
-                    ]
-                }
-            ],
-
+            flights: [],
+            allocations: [],
+            loaRequests: [],
+            consequences: [],
+            reports: [],
+            supportTickets: [],
             firebaseConfig: null
         };
     }
