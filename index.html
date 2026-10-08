@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luma Oportal - Roblox Airline Staff Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        luma: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            400: '#38bdf8',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                            900: '#0f172a',
+                            dark: '#0b0f19',
+                            card: '#131b2e',
+                            border: '#1e293b',
+                            accent: '#38bdf8',
+                            gold: '#f59e0b',
+                            danger: '#ef4444',
+                            success: '#10b981'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome & Lucide Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for My Stats -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SweetAlert2 for notifications -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Firebase JS SDK Compat Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-luma-dark text-slate-100 min-h-screen font-sans flex flex-col antialiased selection:bg-luma-500 selection:text-white">
+
+    <!-- TOP NAVIGATION BAR (Visible when logged in) -->
+    <header id="top-navbar" class="hidden sticky top-0 z-40 bg-luma-dark/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3 transition-all duration-300">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="app.navigateTo('dashboard')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-luma-600 to-sky-400 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-plane-departure text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wider bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">LUMA OPORTAL</h1>
+                    <p class="text-xs text-sky-400 font-medium tracking-widest uppercase">Roblox Staff Hub</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions & User Info -->
+            <div class="flex items-center gap-3">
+                <!-- User Status Badges -->
+                <div id="nav-user-badges" class="hidden sm:flex items-center gap-2">
+                    <!-- Badges populated by JS -->
+                </div>
+
+                <!-- Admin Panel Button (If Admin) -->
+                <button id="nav-admin-btn" onclick="app.navigateTo('admin')" class="hidden px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-md transition-all">
+                    <i class="fa-solid fa-user-shield"></i> Admin Panel
+                </button>
+
+                <!-- Emergency Alert Broadcast Button (If Admin) -->
+                <button id="nav-emergency-btn" onclick="app.promptEmergencyAlert()" class="hidden px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all animate-pulse">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Emergency Alert
+                </button>
+
+                <!-- Return to Dashboard Button (When inside subpage) -->
+                <button id="nav-dash-btn" onclick="app.navigateTo('dashboard')" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-2 transition-all">
+                    <i class="fa-solid fa-table-cells-large"></i> Hub Grid
+                </button>
+
+                <!-- Logout Button -->
+                <button onclick="app.logout()" class="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-semibold text-xs border border-rose-500/20 flex items-center gap-1.5 transition-all" title="Log out">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden md:inline">Log out</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main id="app-viewport" class="flex-grow flex flex-col p-4 lg:p-8 max-w-7xl w-full mx-auto relative">
+
+        <!-- AUTH SCREEN (Login & Register) -->
+        <section id="auth-screen" class="w-full flex-grow flex items-center justify-center py-6">
+            <div class="w-full max-w-md bg-luma-card border border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-sky-950/40 relative overflow-hidden backdrop-blur-xl animate-fade-in">
+                <!-- Decorative background glow -->
+                <div class="absolute -top-20 -right-20 w-56 h-56 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -left-20 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <!-- Brand Header -->
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-luma-600 via-sky-500 to-indigo-500 flex items-center justify-center shadow-xl shadow-sky-500/25 mb-4 animate-bounce-subtle">
+                        <i class="fa-solid fa-plane text-white text-2xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white tracking-wide">Luma Oportal</h2>
+                    <p class="text-xs text-slate-400 mt-1">Official Roblox Airline Staff Authentication Portal</p>
+                </div>
+
+                <!-- Auth Tabs (Login / Register) -->
+                <div class="flex bg-slate-900/90 p-1 rounded-xl mb-6 border border-slate-800">
+                    <button id="tab-login" onclick="app.switchAuthTab('login')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-luma-600 text-white shadow-md">Log In</button>
+                    <button id="tab-register" onclick="app.switchAuthTab('register')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition-all duration-200">Register</button>
+                </div>
+
+                <!-- LOGIN FORM -->
+                <form id="form-login" onsubmit="app.handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="email" id="login-email" required placeholder="staff@luma-airline.com" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-luma-600 to-sky-500 hover:from-luma-500 hover:to-sky-400 text-white font-bold rounded-xl shadow-lg shadow-sky-600/30 transition-all duration-200 mt-2 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> Access Portal
+                    </button>
+                </form>
+
+                <!-- REGISTER FORM -->
+                <form id="form-register" onsubmit="app.handleRegister(event)" class="space-y-3.5 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Preferred Name</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="text" id="reg-preferred-name" required placeholder="e.g. Alex" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Roblox Username</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-gamepad absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="text" id="reg-roblox-user" required placeholder="e.g. RobloxUser" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Discord Username</label>
+                        <div class="relative">
+                            <i class="fa-brands fa-discord absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="text" id="reg-discord-user" required placeholder="e.g. DiscordUser#1234" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="email" id="reg-email" required placeholder="staff@luma-airline.com" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+                            <input type="password" id="reg-password" required placeholder="Create a secure password" class="w-full bg-slate-900/80 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-lg flex items-start gap-2">
+                        <i class="fa-solid fa-circle-info text-xs mt-0.5"></i>
+                        <span>New accounts require approval from an Admin on the Admin Panel before access is granted.</span>
+                    </p>
+                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition-all duration-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> Submit Registration Request
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SUSPENSION SCREEN (C5 Consequence - Overlays portal if user is suspended) -->
+        <section id="suspension-screen" class="hidden w-full flex-grow flex items-center justify-center py-10">
+            <div class="w-full max-w-lg bg-gradient-to-b from-slate-900 to-rose-950/40 border border-rose-600/40 rounded-2xl p-8 shadow-2xl text-center relative overflow-hidden animate-pulse-subtle">
+                <div class="w-20 h-20 mx-auto rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-rose-500 text-3xl mb-6 shadow-lg shadow-rose-500/30">
+                    <i class="fa-solid fa-ban"></i>
+                </div>
+                <h2 class="text-3xl font-extrabold text-white tracking-wide uppercase">ACCOUNT SUSPENDED</h2>
+                <p class="text-slate-300 text-sm mt-2 max-w-md mx-auto">
+                    Your portal access has been temporarily suspended due to a Level 5 (C5) Consequence action.
+                </p>
+
+                <!-- Countdown Timer -->
+                <div class="my-8 bg-slate-950/80 border border-rose-900/50 rounded-2xl p-6 shadow-inner">
+                    <p class="text-xs text-rose-400 font-bold uppercase tracking-widest mb-2">Time Remaining Until Lift</p>
+                    <div id="suspension-timer" class="text-4xl sm:text-5xl font-mono font-black text-rose-500 tracking-wider">
+                        00d 00h 00m 00s
+                    </div>
+                </div>
+
+                <!-- Error Code (Summer) -->
+                <div class="inline-block bg-slate-950/90 px-4 py-2 rounded-xl border border-slate-800">
+                    <span class="text-xs text-slate-400">System Error Code: </span>
+                    <span class="text-sm font-mono font-bold text-amber-400 uppercase tracking-widest">(Summer)</span>
+                </div>
+
+                <div class="mt-8">
+                    <button onclick="app.logout()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-all border border-slate-700">
+                        <i class="fa-solid fa-arrow-left"></i> Return to Login
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- DASHBOARD HUB (Grid View) -->
+        <section id="dashboard-screen" class="hidden space-y-8 animate-fade-in">
+            <!-- TOP WELCOME BANNER -->
+            <div class="bg-gradient-to-r from-luma-card via-slate-900 to-indigo-950/60 border border-slate-800 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+                <div class="space-y-2 relative z-10">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
+                            Hello <span id="dash-user-name" class="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">Staff Member</span>
+                        </h2>
+                        <span id="dash-user-role" class="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                            Staff
+                        </span>
+                    </div>
+                    <p class="text-slate-400 text-sm max-w-xl">
+                        Welcome to the Luma Roblox Airline Staff Operations Hub. Select a portal module below to manage allocations, review upcoming flights, submit applications, or monitor performance.
+                    </p>
+                </div>
+
+                <!-- Quota Summary Widget -->
+                <div id="dash-quota-card" class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 w-full md:w-auto min-w-[240px] flex items-center justify-between gap-4">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium">Weekly Flight Quota</p>
+                        <p id="dash-quota-status" class="text-lg font-bold text-white mt-0.5">0/3 Completed</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-luma-500/20 border border-luma-500/30 flex items-center justify-center text-luma-400 text-lg">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3-LENGTH GRID OF ANIMATED MODULE CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <!-- 1. CALENDAR -->
+                <div onclick="app.navigateTo('calendar')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-6 shadow-lg hover:shadow-sky-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 group-hover:bg-sky-500 group-hover:text-white flex items-center justify-center text-sky-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-calendar-days"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-sky-400 transition-colors">Module 01</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-sky-300 transition-colors">Calendar</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            View all upcoming flights on an interactive monthly calendar. Click flight dates to register attendance or submit detailed absence reasons.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-sky-400">
+                        <span>Open Schedule</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 2. ALLOCATIONS -->
+                <div onclick="app.navigateTo('allocations')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 shadow-lg hover:shadow-indigo-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 group-hover:bg-indigo-500 group-hover:text-white flex items-center justify-center text-indigo-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-clipboard-user"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-indigo-400 transition-colors">Module 02</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">Allocations</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            List upcoming flights and allocate your duty role (Cabin Crew, Captain, Security, etc.) or declare absence with mandatory reasons.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
+                        <span>Manage Duty Roles</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 3. LOA & REDUCED ACTIVITY -->
+                <div onclick="app.navigateTo('loa')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 shadow-lg hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 group-hover:bg-amber-500 group-hover:text-slate-950 flex items-center justify-center text-amber-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-business-time"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-amber-400 transition-colors">Module 03</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">LOA & Activity</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            Apply for Leave of Absence (0 flights) or Reduced Activity (1 flight/week). Quota exceptions apply automatically until the set expiry date.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
+                        <span>Submit Request</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 4. CONSEQUENCES -->
+                <div onclick="app.navigateTo('consequences')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-2xl p-6 shadow-lg hover:shadow-rose-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 group-hover:bg-rose-500 group-hover:text-white flex items-center justify-center text-rose-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-rose-400 transition-colors">Module 04</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-rose-300 transition-colors">Consequences</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            Track warnings (C1-C2), sanctions (C3), detentions (C4A/B schedule & location), and active suspension monitors.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-rose-400">
+                        <span>View Ledger</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 5. REPORTS -->
+                <div onclick="app.navigateTo('reports')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 shadow-lg hover:shadow-emerald-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center text-emerald-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-flag"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-emerald-400 transition-colors">Module 05</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">Reports</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            File incident reports against players with evidence images. Track review status (Processing, In Review, Closed) and admin replies.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
+                        <span>File / View Reports</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 6. MY STATS -->
+                <div onclick="app.navigateTo('stats')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-2xl p-6 shadow-lg hover:shadow-cyan-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 group-hover:bg-cyan-500 group-hover:text-slate-950 flex items-center justify-center text-cyan-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-cyan-400 transition-colors">Module 06</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">My Stats</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            Analyze your 5-week flight trends graph, total flights attended, praise points accumulated, reports submitted, and staff tenure.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-cyan-400">
+                        <span>View Analytics</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 7. SUPPORT TICKETS -->
+                <div onclick="app.navigateTo('support')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden md:col-span-2 lg:col-span-1">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center text-purple-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-headset"></i>
+                        </div>
+                        <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider group-hover:text-purple-400 transition-colors">Module 07</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">Support Desk</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            Open 1-to-1 live support tickets with Head Admins & Admins for assistance or bug reports. Closed tickets are safely archived on file.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
+                        <span>Open Live Chat</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- PAGE 1: CALENDAR VIEW -->
+        <section id="page-calendar" class="hidden space-y-6 animate-fade-in">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-luma-card border border-slate-800 rounded-2xl p-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-calendar-days text-sky-400"></i> Upcoming Flights Calendar
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">Click any highlighted flight date to inspect scheduled flights and manage your allocation.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="app.changeMonth(-1)" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-semibold">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <span id="calendar-month-year" class="text-sm font-bold text-white px-4 py-2 bg-slate-900 rounded-xl border border-slate-800 min-w-[140px] text-center">
+                        October 2026
+                    </span>
+                    <button onclick="app.changeMonth(1)" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-semibold">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calendar Grid Container -->
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <!-- Day Headers -->
+                <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 pb-2 border-b border-slate-800">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <!-- Month Days Grid -->
+                <div id="calendar-days-grid" class="grid grid-cols-7 gap-2 min-h-[380px]">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Selected Date Flight Details Modal/Panel -->
+            <div id="calendar-flight-modal" class="hidden bg-slate-900/95 border border-sky-500/30 rounded-2xl p-6 shadow-2xl space-y-4 animate-slide-up">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-plane-arrival text-sky-400"></i> Flights for <span id="modal-flight-date" class="text-sky-300">Selected Date</span>
+                    </h3>
+                    <button onclick="document.getElementById('calendar-flight-modal').classList.add('hidden')" class="text-slate-400 hover:text-white text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div id="modal-flight-list" class="space-y-4">
+                    <!-- Flights list inserted via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 2: ALLOCATIONS VIEW -->
+        <section id="page-allocations" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-clipboard-user text-indigo-400"></i> Flight Duty Allocations
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">Review upcoming flights, mark present/absent status, and assign crew duty roles.</p>
+                </div>
+            </div>
+
+            <!-- List of Upcoming Flights with Allocation Controls -->
+            <div id="allocations-flight-container" class="space-y-6">
+                <!-- Flight cards dynamically rendered -->
+            </div>
+        </section>
+
+        <!-- PAGE 3: LOA & REDUCED ACTIVITY -->
+        <section id="page-loa" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <i class="fa-solid fa-business-time text-amber-400"></i> Leave of Absence & Reduced Activity
+                </h2>
+                <p class="text-slate-400 text-xs mt-1">Submit applications for LOA (0 flights needed) or Reduced Activity (1 flight/week quota).</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Application Form -->
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-amber-400"></i> Request Status Change
+                    </h3>
+                    <form onsubmit="app.handleLOASubmit(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Application Type</label>
+                            <select id="loa-type" required class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+                                <option value="LOA">Leave of Absence (LOA - 0 Flights/Week)</option>
+                                <option value="Reduced Activity">Reduced Activity (1 Flight/Week)</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+                                <input type="date" id="loa-start-date" required class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+                                <input type="date" id="loa-end-date" required class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Reason for Request</label>
+                            <textarea id="loa-reason" rows="3" required placeholder="State your reason for LOA or Reduced Activity..." class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl p-3 text-xs text-white placeholder-slate-500 outline-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all">
+                            Submit Application
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Active & History List -->
+                <div class="lg:col-span-2 bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-list-check text-amber-400 mr-2"></i> Application Status & Active Exceptions</span>
+                    </h3>
+                    <div id="loa-list-container" class="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+                        <!-- Dynamic LOA requests -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 4: CONSEQUENCES -->
+        <section id="page-consequences" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Disciplinary & Consequence Ledger
+                </h2>
+                <p class="text-slate-400 text-xs mt-1">Review assigned warnings (C1-C2), informal sanctions (C3), detentions (C4), and suspensions (C5).</p>
+            </div>
+
+            <!-- Tally & Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-4 text-center">
+                    <p class="text-xs text-slate-400 font-bold uppercase">C1-C2 Warnings</p>
+                    <p id="tally-warnings" class="text-3xl font-black text-amber-400 mt-1">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-4 text-center">
+                    <p class="text-xs text-slate-400 font-bold uppercase">C3 Informal</p>
+                    <p id="tally-c3" class="text-3xl font-black text-orange-400 mt-1">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-4 text-center">
+                    <p class="text-xs text-slate-400 font-bold uppercase">C4 Detentions</p>
+                    <p id="tally-c4" class="text-3xl font-black text-rose-400 mt-1">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-4 text-center">
+                    <p class="text-xs text-slate-400 font-bold uppercase">C5 Suspensions</p>
+                    <p id="tally-c5" class="text-3xl font-black text-red-600 mt-1">0</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Upcoming Sanctions (C4 Detentions) -->
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-clock text-rose-400"></i> Upcoming Sanctions (C4 Detentions)</span>
+                    </h3>
+                    <div id="c4-sanctions-list" class="space-y-3">
+                        <!-- C4 detentions rendered here -->
+                    </div>
+                </div>
+
+                <!-- Full History Ledger -->
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-receipt text-slate-400"></i> Full Consequence History
+                    </h3>
+                    <div id="consequence-history-list" class="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                        <!-- History rendered here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 5: REPORTS -->
+        <section id="page-reports" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-flag text-emerald-400"></i> Player & Staff Incident Reports
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">File reports against players or staff with evidence image attachments.</p>
+                </div>
+                <button onclick="app.toggleReportForm()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Submit New Report
+                </button>
+            </div>
+
+            <!-- Create Report Form Modal / Drawer -->
+            <div id="report-form-container" class="hidden bg-luma-card border border-emerald-500/30 rounded-2xl p-6 shadow-2xl space-y-4 animate-slide-down">
+                <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen text-emerald-400"></i> File Incident Report
+                </h3>
+                <form onsubmit="app.handleReportSubmit(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Target Roblox Username</label>
+                            <input type="text" id="report-target-user" required placeholder="e.g. RuleBreaker123" class="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Offense Category</label>
+                            <select id="report-offense" required class="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
+                                <option value="Disruption / Griefing">Disruption / Griefing</option>
+                                <option value="Insubordination">Insubordination</option>
+                                <option value="Exploiting / Cheating">Exploiting / Cheating</option>
+                                <option value="Inappropriate Conduct">Inappropriate Conduct</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Detailed Description</label>
+                        <textarea id="report-description" rows="3" required placeholder="Describe what occurred with specific timestamps or details..." class="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl p-3 text-xs text-white outline-none"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Evidence Image (Upload File or Paste URL)</label>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input type="file" id="report-image-file" accept="image/*" onchange="app.handleImageUpload(event)" class="text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer">
+                            <input type="url" id="report-image-url" placeholder="Or paste image URL (https://...)" class="flex-grow bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                        </div>
+                        <!-- Image Preview Box -->
+                        <div id="report-image-preview-box" class="hidden mt-3 p-2 bg-slate-950 rounded-xl border border-slate-800 max-w-xs">
+                            <img id="report-image-preview" src="" alt="Evidence preview" class="w-full h-36 object-cover rounded-lg">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" onclick="app.toggleReportForm()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">Cancel</button>
+                        <button type="submit" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg">Submit Report</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- List of Submitted Reports -->
+            <div id="reports-list-container" class="space-y-4">
+                <!-- Reports rendered here -->
+            </div>
+        </section>
+
+        <!-- PAGE 6: MY STATS -->
+        <section id="page-stats" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <i class="fa-solid fa-chart-line text-cyan-400"></i> Performance & Flight Analytics
+                </h2>
+                <p class="text-slate-400 text-xs mt-1">Detailed breakdown of flight participation, praise points, and tenure.</p>
+            </div>
+
+            <!-- Counter Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between text-cyan-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Flights</span>
+                        <i class="fa-solid fa-plane-flight text-lg"></i>
+                    </div>
+                    <p id="stat-total-flights" class="text-3xl font-extrabold text-white">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between text-amber-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Praise Points</span>
+                        <i class="fa-solid fa-award text-lg"></i>
+                    </div>
+                    <p id="stat-praise-points" class="text-3xl font-extrabold text-white">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between text-emerald-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Reports Filed</span>
+                        <i class="fa-solid fa-shield-halved text-lg"></i>
+                    </div>
+                    <p id="stat-total-reports" class="text-3xl font-extrabold text-white">0</p>
+                </div>
+                <div class="bg-luma-card border border-slate-800 rounded-xl p-5 shadow-lg">
+                    <div class="flex items-center justify-between text-purple-400 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Staff Tenure</span>
+                        <i class="fa-solid fa-clock text-lg"></i>
+                    </div>
+                    <p id="stat-tenure" class="text-xl font-extrabold text-white">0 Days</p>
+                </div>
+            </div>
+
+            <!-- 5-Week Flight Trend Chart -->
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-chart-area text-cyan-400"></i> 5-Week Flight Activity Graph</span>
+                    <span class="text-xs text-slate-400">Shows weekly flight attendance progression</span>
+                </h3>
+                <div class="h-72 w-full">
+                    <canvas id="flight-stats-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 7: SUPPORT DESK -->
+        <section id="page-support" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-headset text-purple-400"></i> Support & Bug Ticket Hub
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">Open 1-to-1 live messaging tickets with Admins. Closed tickets are saved on file for reopening.</p>
+                </div>
+                <button onclick="app.toggleNewTicketModal()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Open New Ticket
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Ticket List Sidebar -->
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-2">Your Support Tickets</h3>
+                    <div id="support-ticket-list" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Live Ticket Messaging Window -->
+                <div class="lg:col-span-2 bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col min-h-[520px]">
+                    <div id="ticket-chat-header" class="border-b border-slate-800 pb-4 mb-4 flex items-center justify-between">
+                        <div>
+                            <h3 id="chat-ticket-subject" class="text-lg font-bold text-white">Select a Ticket</h3>
+                            <p id="chat-ticket-meta" class="text-xs text-slate-400">Choose a ticket from the left panel to begin live messaging.</p>
+                        </div>
+                        <div id="chat-ticket-actions" class="hidden flex items-center gap-2">
+                            <!-- Admin / Owner Actions (Close / Reopen / Escalate) -->
+                        </div>
+                    </div>
+
+                    <!-- Chat Message Area -->
+                    <div id="ticket-messages-box" class="flex-grow overflow-y-auto space-y-3 p-3 bg-slate-950/80 rounded-xl border border-slate-800 mb-4 max-h-[360px]">
+                        <div class="text-center text-slate-500 text-xs py-12">Select or create a ticket to load conversation messages.</div>
+                    </div>
+
+                    <!-- Reply Input Form -->
+                    <form id="ticket-reply-form" onsubmit="app.handleTicketReply(event)" class="hidden flex gap-2">
+                        <input type="text" id="ticket-reply-input" required placeholder="Type your message to support staff..." class="flex-grow bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                        <button type="submit" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> Send
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 8: ADMIN PANEL (PARENT HUB) -->
+        <section id="page-admin" class="hidden space-y-6 animate-fade-in">
+            <!-- Admin Header -->
+            <div class="bg-gradient-to-r from-amber-950/80 via-luma-card to-slate-900 border border-amber-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <span class="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-black uppercase tracking-wider rounded-lg">Admin Command Center</span>
+                        <h2 class="text-2xl font-bold text-white">Management & Control</h2>
+                    </div>
+                    <p class="text-slate-400 text-xs mt-1">Central management for flight creation, staff requests, role promotions, consequences, and reports.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="app.openFirebaseConfigModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold text-xs rounded-xl flex items-center gap-2">
+                        <i class="fa-solid fa-fire"></i> Firebase Sync Config
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Sub-Navigation Tabs -->
+            <div class="flex flex-wrap bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 gap-1">
+                <button id="admin-tab-requests" onclick="app.switchAdminTab('requests')" class="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-amber-500 text-slate-950 shadow-md">
+                    <i class="fa-solid fa-user-clock mr-1.5"></i> Staff Requests (<span id="admin-pending-count">0</span>)
+                </button>
+                <button id="admin-tab-roster" onclick="app.switchAdminTab('roster')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-users mr-1.5"></i> Staff Roster & Roles
+                </button>
+                <button id="admin-tab-c4register" onclick="app.switchAdminTab('c4register')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-clipboard-check mr-1.5 text-rose-400"></i> C4 Register
+                </button>
+                <button id="admin-tab-logconsequence" onclick="app.switchAdminTab('logconsequence')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-gavel mr-1.5 text-amber-400"></i> Log Consequence
+                </button>
+                <button id="admin-tab-flights" onclick="app.switchAdminTab('flights')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-plane-circle-plus mr-1.5"></i> Create & Manage Flights
+                </button>
+                <button id="admin-tab-reports" onclick="app.switchAdminTab('reports')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-shield-cat mr-1.5"></i> Review Reports
+                </button>
+                <button id="admin-tab-tickets" onclick="app.switchAdminTab('tickets')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-headset mr-1.5"></i> Support Desk Tickets
+                </button>
+            </div>
+
+            <!-- ADMIN TAB 1: STAFF REQUESTS -->
+            <div id="admin-section-requests" class="space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-user-plus text-amber-400 mr-2"></i> Pending Registration Approval Requests</span>
+                    </h3>
+                    <div id="admin-requests-list" class="space-y-3">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 2: STAFF ROSTER & PROMOTIONS -->
+            <div id="admin-section-roster" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-users-gear text-amber-400 mr-2"></i> Active Staff Directory & Disciplinary Controls</span>
+                        <span class="text-xs text-amber-400 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg">
+                            <i class="fa-solid fa-lock text-xs mr-1"></i> Promotion Gate Password Encrypted
+                        </span>
+                    </h3>
+                    <div id="admin-roster-list" class="space-y-3">
+                        <!-- Roster rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB: C4 DETENTION REGISTER -->
+            <div id="admin-section-c4register" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-clipboard-check text-rose-400 mr-2"></i> C4 Detention Register & Pass/Fail Evaluation Desk</span>
+                        <span class="text-xs text-rose-300 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-lg">
+                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> C4A Fail &rarr; C4B | C4B Fail &rarr; 2-Day Suspension
+                        </span>
+                    </h3>
+                    <div id="admin-c4-register-list" class="space-y-4">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB: LOG CONSEQUENCE FORM -->
+            <div id="admin-section-logconsequence" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 max-w-2xl mx-auto">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-gavel text-amber-400"></i> Issue & Log Staff Consequence
+                    </h3>
+                    <form onsubmit="app.handleAdminLogConsequence(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Target Staff Member</label>
+                            <select id="admin-log-target-user" required class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                                <!-- Populated dynamically by JS -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Consequence Level</label>
+                            <select id="admin-log-level" onchange="app.toggleAdminLogFields()" required class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                                <option value="C1">C1 - First Warning</option>
+                                <option value="C2">C2 - Second Warning</option>
+                                <option value="C3">C3 - Informal Sanction</option>
+                                <option value="C4A">C4A - Detention (20 Minutes)</option>
+                                <option value="C4B">C4B - Detention (40 Minutes)</option>
+                                <option value="C5">C5 - Suspension (Account Lockout)</option>
+                            </select>
+                        </div>
+
+                        <!-- C4 Specific Fields -->
+                        <div id="admin-log-c4-fields" class="hidden space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1">Date to Attend</label>
+                                    <input type="date" id="admin-log-c4-date" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-300 mb-1">Time</label>
+                                    <input type="time" id="admin-log-c4-time" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Location / Game Room</label>
+                                <input type="text" id="admin-log-c4-location" placeholder="e.g. Luma Training Facility / Discord Room A" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                            </div>
+                        </div>
+
+                        <!-- C5 Specific Fields -->
+                        <div id="admin-log-c5-fields" class="hidden space-y-3 bg-slate-950 p-4 rounded-xl border border-rose-950">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-300 mb-1">Suspension Duration (Hours)</label>
+                                <input type="number" id="admin-log-c5-hours" min="1" max="720" value="48" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                                <p class="text-[10px] text-slate-400 mt-1">Default 48 hours = 2-Day Suspension.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Reason / Notes</label>
+                            <textarea id="admin-log-reason" rows="3" required placeholder="State official reason for issuing this consequence action..." class="w-full bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl p-3 text-xs text-white outline-none"></textarea>
+                        </div>
+
+                        <button type="submit" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all">
+                            <i class="fa-solid fa-gavel mr-1.5"></i> Log Consequence Action
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div id="admin-section-flights" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Create Flight Form -->
+                    <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                        <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-plane-departure text-sky-400"></i> Schedule New Flight
+                        </h3>
+                        <form onsubmit="app.handleCreateFlight(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Flight Code</label>
+                                <input type="text" id="flight-code" required placeholder="e.g. LM-402" class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Flight Host</label>
+                                <input type="text" id="flight-host" required placeholder="e.g. JAMIE" class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Aircraft</label>
+                                <input type="text" id="flight-aircraft" required placeholder="e.g. Airbus A320neo / Boeing 787" class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Airport Name</label>
+                                <input type="text" id="flight-airport" required placeholder="e.g. Luma International Airport" class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Roblox Airport Join Link</label>
+                                <input type="url" id="flight-airport-link" required placeholder="https://www.roblox.com/games/..." class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-2 text-xs text-white outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+                                    <input type="date" id="flight-date" required class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-300 mb-1">Time (UTC/EST)</label>
+                                    <input type="time" id="flight-time" required class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-sky-500 to-luma-600 hover:from-sky-400 hover:to-luma-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all">
+                                <i class="fa-solid fa-plus mr-1"></i> Publish Flight Schedule
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Manage Active Flights & View Absences -->
+                    <div class="lg:col-span-2 bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                        <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                            <span><i class="fa-solid fa-list text-sky-400 mr-2"></i> Scheduled Flights & Absence Log</span>
+                        </h3>
+                        <div id="admin-flights-list" class="space-y-4 max-h-[550px] overflow-y-auto pr-1">
+                            <!-- Flights rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 4: REPORTS REVIEW -->
+            <div id="admin-section-reports" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-shield-cat text-emerald-400 mr-2"></i> Report Review & Moderation</span>
+                    </h3>
+                    <div id="admin-reports-list" class="space-y-4">
+                        <!-- Admin reports list -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB 5: SUPPORT TICKETS DESK -->
+            <div id="admin-section-tickets" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-headset text-purple-400 mr-2"></i> Support Ticket Command Desk</span>
+                    </h3>
+                    <div id="admin-tickets-list" class="space-y-3">
+                        <!-- Admin tickets list -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="mt-auto border-t border-slate-800/80 py-4 px-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p>&copy; 2026 Luma Roblox Airline. All Rights Reserved. Staff Portal System.</p>
+            <div class="flex items-center gap-4 text-slate-400">
+                <span class="hover:text-slate-200 cursor-pointer" onclick="Swal.fire('Luma Oportal', 'Official Roblox Staff Operations & Allocation System.', 'info')">About</span>
+                <span>•</span>
+                <span class="hover:text-slate-200 cursor-pointer" onclick="app.openFirebaseConfigModal()">Firebase Integration</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MODAL: NEW SUPPORT TICKET -->
+    <div id="modal-new-ticket" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-luma-card border border-purple-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-up">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-headset text-purple-400"></i> Open Support Ticket
+                </h3>
+                <button onclick="app.toggleNewTicketModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="app.handleCreateTicket(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Subject / Issue Title</label>
+                    <input type="text" id="ticket-subject" required placeholder="e.g. Schedule Bug or Allocation Query" class="w-full bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Category</label>
+                    <select id="ticket-category" required class="w-full bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                        <option value="Bug Report">Bug Report</option>
+                        <option value="Allocation Inquiry">Allocation Inquiry</option>
+                        <option value="LOA / Quota Assistance">LOA / Quota Assistance</option>
+                        <option value="Other Assistance">Other Assistance</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Detailed Message</label>
+                    <textarea id="ticket-message" rows="3" required placeholder="Describe your inquiry in detail..." class="w-full bg-slate-900 border border-slate-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="app.toggleNewTicketModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-lg">Submit Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: GIVE CONSEQUENCE (ADMIN) -->
+    <div id="modal-give-consequence" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-luma-card border border-rose-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-up">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-gavel text-rose-400"></i> Assign Consequence Action
+                </h3>
+                <button onclick="document.getElementById('modal-give-consequence').classList.add('hidden')" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="app.handleAssignConsequence(event)" class="space-y-4">
+                <input type="hidden" id="consequence-target-user-id">
+                <div>
+                    <p class="text-xs text-slate-400">Target Staff: <span id="consequence-target-name" class="font-bold text-white">Target</span></p>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Consequence Level</label>
+                    <select id="consequence-level" onchange="app.toggleConsequenceFields()" required class="w-full bg-slate-900 border border-slate-800 focus:border-rose-500 rounded-xl px-4 py-2.5 text-xs text-white outline-none">
+                        <option value="C1">C1 - First Warning</option>
+                        <option value="C2">C2 - Second Warning</option>
+                        <option value="C3">C3 - Informal Sanction</option>
+                        <option value="C4A">C4A - Detention (20 Minutes)</option>
+                        <option value="C4B">C4B - Detention (40 Minutes)</option>
+                        <option value="C5">C5 - Suspension (Account Lockout)</option>
+                    </select>
+                </div>
+
+                <!-- C4 Specific Fields -->
+                <div id="c4-fields" class="hidden space-y-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Date to Attend</label>
+                            <input type="date" id="c4-date" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Time</label>
+                            <input type="time" id="c4-time" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Location / Game Link</label>
+                        <input type="text" id="c4-location" placeholder="e.g. Luma Training Facility / Discord Room A" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                    </div>
+                </div>
+
+                <!-- C5 Specific Fields -->
+                <div id="c5-fields" class="hidden space-y-3 bg-slate-950 p-3 rounded-xl border border-rose-950">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Suspension Duration (Hours)</label>
+                        <input type="number" id="c5-duration-hours" min="1" max="720" value="24" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Reason / Notes</label>
+                    <textarea id="consequence-reason" rows="2" required placeholder="Reason for issuing this consequence..." class="w-full bg-slate-900 border border-slate-800 focus:border-rose-500 rounded-xl p-2.5 text-xs text-white outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="document.getElementById('modal-give-consequence').classList.add('hidden')" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg">Issue Consequence</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: FIREBASE CONFIGURATION -->
+    <div id="modal-firebase-config" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-luma-card border border-sky-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scale-up">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-fire text-amber-500"></i> Firebase Database Cloud Setup
+                </h3>
+                <button onclick="app.closeFirebaseConfigModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">
+                Paste your Firebase Web App project configuration below to bridge real-time cloud data sync!
+            </p>
+            <form onsubmit="app.saveFirebaseConfig(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">API Key</label>
+                    <input type="text" id="fb-apiKey" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Auth Domain</label>
+                    <input type="text" id="fb-authDomain" placeholder="luma-oportal.firebaseapp.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Project ID</label>
+                    <input type="text" id="fb-projectId" placeholder="luma-oportal" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="app.closeFirebaseConfigModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-lg">Save Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- HIGH PRIORITY EMERGENCY ALERT MODAL -->
+    <div id="modal-emergency-alert" class="hidden fixed inset-0 z-50 bg-red-950/95 backdrop-blur-lg flex items-center justify-center p-4">
+        <div class="bg-gradient-to-b from-slate-900 via-slate-900 to-red-950/90 border-2 border-red-500/80 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-scale-up">
+            <div class="w-20 h-20 mx-auto rounded-2xl bg-red-600/30 border-2 border-red-500 flex items-center justify-center text-red-500 text-4xl shadow-xl shadow-red-600/50 animate-bounce">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            
+            <div class="space-y-2">
+                <span class="px-3 py-1 bg-red-600 text-white font-black text-xs uppercase tracking-widest rounded-full">HIGH PRIORITY EMERGENCY BROADCAST</span>
+                <h2 class="text-3xl font-black text-white tracking-wide uppercase">Emergency Alert</h2>
+            </div>
+
+            <div class="bg-slate-950/90 border border-red-900/80 p-5 rounded-2xl text-left shadow-inner">
+                <p id="emergency-alert-text" class="text-sm font-semibold text-slate-100 leading-relaxed">
+                    Emergency Broadcast Info...
+                </p>
+                <div class="flex items-center justify-between text-[11px] text-red-400 font-mono mt-4 pt-2 border-t border-slate-800">
+                    <span id="emergency-alert-sender">Issued by: Head Admin Command</span>
+                    <span id="emergency-alert-time">Broadcasted: Just now</span>
+                </div>
+            </div>
+
+            <button onclick="app.dismissEmergencyAlert()" class="w-full py-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-red-600/50 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
+                <i class="fa-solid fa-bell-slash"></i> Dismiss Alert
+            </button>
+        </div>
+    </div>
+
+    <!-- Emergency Alarm Audio Element (Looping MP3) -->
+    <audio id="emergency-alarm-audio" src="assets/emergency-alarm.mp3" loop preload="auto"></audio>
+
+    <!-- Application JavaScript Modules -->
+    <script src="js/crypto-utils.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
