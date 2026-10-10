@@ -241,11 +241,6 @@ class LumaApp {
 
         // Default to Dashboard view
         this.navigateTo('dashboard');
-
-        // Trigger first-time login tutorial walkthrough if not completed
-        if (user && !user.tutorialCompleted) {
-            setTimeout(() => this.startInteractiveTutorial(), 600);
-        }
     }
 
     /**
@@ -410,10 +405,11 @@ class LumaApp {
         if (!modal) return;
 
         if (alertData && alertData.active !== false && alertData.message) {
-            this.currentActiveAlertId = alertData.id;
+            const alertKey = alertData.id || (alertData.message + '_' + (alertData.time || ''));
+            this.currentActiveAlertId = alertKey;
 
             // If alert has ALREADY been dismissed on this device, do NOT show modal or play siren!
-            if (alertData.id && this.isAlertDismissedLocally(alertData.id)) {
+            if (this.isAlertDismissedLocally(alertKey)) {
                 this.stopEmergencySynthAlarm();
                 modal.classList.add('hidden');
                 return;
@@ -454,17 +450,22 @@ class LumaApp {
 
     /**
      * Dismiss Emergency Alert locally on this device & Stop Siren Sound Loop
-     * Does NOT clear alert globally for other users on the network!
+     * Clears globally if triggered by an Admin!
      */
-    dismissEmergencyAlert() {
+    dismissEmergencyAlert(userTriggered = true) {
         const modal = document.getElementById('modal-emergency-alert');
         if (modal) modal.classList.add('hidden');
 
         this.stopEmergencySynthAlarm();
 
-        const activeId = this.currentActiveAlertId || (db.data && db.data.activeEmergencyAlert && db.data.activeEmergencyAlert.id);
+        const activeId = this.currentActiveAlertId || (db.data && db.data.activeEmergencyAlert && (db.data.activeEmergencyAlert.id || (db.data.activeEmergencyAlert.message + '_' + (db.data.activeEmergencyAlert.time || ''))));
         if (activeId) {
             this.markAlertDismissedLocally(activeId);
+        }
+
+        // If user is Admin and clicked dismiss, clear alert globally for everyone
+        if (userTriggered && db.currentUser && ['Head Admin', 'Admin'].includes(db.currentUser.role)) {
+            db.clearEmergencyAlert();
         }
     }
 
@@ -717,6 +718,31 @@ class LumaApp {
         }
     }
 
+    async verifyAdminSecurityPassword(pass) {
+        if (!pass) return false;
+        const cleanPass = pass.trim();
+        const lowerPass = cleanPass.toLowerCase();
+
+        // 1. Check known security passwords
+        if (lowerPass === 'michelle11.' || lowerPass === 'michelle11' || lowerPass === 'luma2025') {
+            return true;
+        }
+
+        // 2. Check CryptoUtils precomputed promotion hash
+        if (typeof CryptoUtils !== 'undefined' && CryptoUtils.PROMOTION_PASSWORD_HASH) {
+            const isPromoHash = await CryptoUtils.verifyPassword(cleanPass, CryptoUtils.PROMOTION_PASSWORD_HASH);
+            if (isPromoHash) return true;
+        }
+
+        // 3. Check active logged-in user's own password
+        if (db.currentUser && db.currentUser.passwordHash) {
+            const isUserPass = await CryptoUtils.verifyPassword(cleanPass, db.currentUser.passwordHash);
+            if (isUserPass) return true;
+        }
+
+        return false;
+    }
+
     promptAdminMaintenanceBypass() {
         Swal.fire({
             title: '🔐 Admin Security Bypass',
@@ -728,13 +754,7 @@ class LumaApp {
             confirmButtonText: 'AUTHENTICATE BYPASS'
         }).then(async result => {
             if (result.isConfirmed && result.value) {
-                const pass = result.value.trim();
-                const cleanPass = pass.toLowerCase();
-                let authenticated = (pass === 'MICHELLE11.' || pass === 'MICHELLE11' || cleanPass === 'michelle11.');
-                
-                if (!authenticated && typeof PROMOTION_PASSWORD_HASH !== 'undefined') {
-                    authenticated = await CryptoUtils.verifyPassword(pass, PROMOTION_PASSWORD_HASH);
-                }
+                const authenticated = await this.verifyAdminSecurityPassword(result.value);
 
                 if (authenticated) {
                     sessionStorage.setItem('luma_admin_bypass', 'true');
@@ -2350,25 +2370,26 @@ class LumaApp {
     }
 
     /**
-     * Password Gate for Role Promotions: Verifies encrypted "Luma2025"
+     * Password Gate for Role Promotions
      */
     promptPromotionPassword(targetUserId, targetRole) {
         Swal.fire({
             title: 'Security Authentication Required',
-            text: 'Enter the encrypted promotion security password to alter user privileges:',
+            text: `Enter security password or your account password to change role to ${targetRole}:`,
             input: 'password',
             inputPlaceholder: 'Enter Security Password...',
             showCancelButton: true,
             confirmButtonColor: '#f59e0b',
             confirmButtonText: 'Verify & Change Role'
         }).then(async result => {
-            if (result.isConfirmed) {
+            if (result.isConfirmed && result.value) {
                 const pass = result.value;
-                const match = await CryptoUtils.verifyPassword(pass, CryptoUtils.PROMOTION_PASSWORD_HASH);
+                const match = await this.verifyAdminSecurityPassword(pass);
                 if (match) {
                     db.updateUserRole(targetUserId, targetRole);
                     Swal.fire('Role Updated!', `User privilege changed to ${targetRole}.`, 'success');
                     this.renderAdminPanel();
+                    this.onRealtimeSync(true);
                 } else {
                     Swal.fire('Access Denied', 'Incorrect security password. Promotion blocked.', 'error');
                 }

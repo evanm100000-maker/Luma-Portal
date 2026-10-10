@@ -232,7 +232,8 @@ class LumaDB {
                 activityStatus: 'Normal',
                 loaUntil: null,
                 suspensionUntil: null,
-                suspensionReason: null
+                suspensionReason: null,
+                tutorialCompleted: true
             };
             this.data.users.push(founder);
         }
@@ -399,7 +400,8 @@ class LumaDB {
             activityStatus: 'Normal',
             loaUntil: null,
             suspensionUntil: null,
-            suspensionReason: null
+            suspensionReason: null,
+            tutorialCompleted: true
         };
 
         this.data.users.push(newUser);
