@@ -16,9 +16,95 @@ class LumaApp {
      * Bootstraps application
      */
     async init() {
+        this.initSecurityShield();
         await db.init();
         this.checkAuth();
         this.startRealtimeHeartbeat();
+    }
+
+    /**
+     * Site Anti-Tamper & DevTools Security Shield
+     * Protects user credentials and immediately redirects suspicious activity (DevTools, Inspect, Shortcuts) to Google.com
+     */
+    initSecurityShield() {
+        const triggerSecurityRedirect = (reason) => {
+            try {
+                if (window.console) console.clear();
+                if (window.db) window.db.logout();
+                sessionStorage.clear();
+                localStorage.removeItem('luma_active_session');
+            } catch (e) {}
+            window.location.href = 'https://google.com';
+        };
+
+        // 1. Intercept & Block Inspect Element Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            // F12 key
+            if (e.keyCode === 123) {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerSecurityRedirect('F12 key pressed');
+                return false;
+            }
+            // Ctrl+Shift+I / J / C (or Cmd+Option+I / J / C)
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerSecurityRedirect('DevTools Inspector shortcut');
+                return false;
+            }
+            // Ctrl+U / Cmd+U (View Page Source)
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 85) {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerSecurityRedirect('View Source shortcut');
+                return false;
+            }
+            // Ctrl+S / Cmd+S (Save Page)
+            if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }, true);
+
+        // 2. Disable Right-Click Context Menu (Anti-Inspect)
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            return false;
+        }, true);
+
+        // 3. DevTools Outer vs Inner Window Dimension Change Monitor
+        const checkDevToolsDimensions = () => {
+            const widthDiff = window.outerWidth - window.innerWidth;
+            const heightDiff = window.outerHeight - window.innerHeight;
+            if (widthDiff > 160 || heightDiff > 160) {
+                triggerSecurityRedirect('DevTools docked panel detected');
+            }
+        };
+
+        window.addEventListener('resize', checkDevToolsDimensions);
+        setInterval(checkDevToolsDimensions, 1000);
+
+        // 4. Debugger Breakpoint Loop Monitor
+        setInterval(() => {
+            const startTime = performance.now();
+            (function() { return false; })["constructor"]("debugger")();
+            const endTime = performance.now();
+            if (endTime - startTime > 100) {
+                triggerSecurityRedirect('Debugger breakpoint attached');
+            }
+        }, 1500);
+
+        // 5. Suppress Console Log Extraction
+        if (window.console) {
+            const noop = () => {};
+            console.log = noop;
+            console.info = noop;
+            console.warn = noop;
+            console.dir = noop;
+            console.table = noop;
+        }
     }
 
     /**
@@ -671,8 +757,13 @@ class LumaApp {
      */
     async handleLogin(e) {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+        const emailEl = document.getElementById('login-email');
+        const passEl = document.getElementById('login-password');
+        const email = emailEl.value;
+        const password = passEl.value;
+
+        // Immediately wipe password from input DOM field
+        if (passEl) passEl.value = '';
 
         try {
             const user = await db.loginUser(email, password);
@@ -696,7 +787,11 @@ class LumaApp {
         const robloxUser = document.getElementById('reg-roblox-user').value;
         const discordUser = document.getElementById('reg-discord-user').value;
         const email = document.getElementById('reg-email').value;
-        const password = document.getElementById('reg-password').value;
+        const passEl = document.getElementById('reg-password');
+        const password = passEl.value;
+
+        // Immediately wipe password from input DOM field
+        if (passEl) passEl.value = '';
 
         try {
             await db.registerUser({ preferredName, robloxUser, discordUser, email, password });
