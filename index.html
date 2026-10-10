@@ -780,6 +780,9 @@
                 <button id="admin-tab-c4register" onclick="app.switchAdminTab('c4register')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
                     <i class="fa-solid fa-clipboard-check mr-1.5 text-rose-400"></i> C4 Register
                 </button>
+                <button id="admin-tab-attendance" onclick="app.switchAdminTab('attendance')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-clipboard-user mr-1.5 text-sky-400"></i> Attendance Register
+                </button>
                 <button id="admin-tab-logconsequence" onclick="app.switchAdminTab('logconsequence')" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all">
                     <i class="fa-solid fa-gavel mr-1.5 text-amber-400"></i> Log Consequence
                 </button>
@@ -831,6 +834,21 @@
                         </span>
                     </h3>
                     <div id="admin-c4-register-list" class="space-y-4">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN TAB: FLIGHT ATTENDANCE REGISTER -->
+            <div id="admin-section-attendance" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-clipboard-user text-sky-400 mr-2"></i> Staff Flight Attendance Verification Register</span>
+                        <span class="text-xs text-sky-300 font-semibold bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-lg">
+                            <i class="fa-solid fa-check-double mr-1"></i> Verify staff attendance to credit weekly flight quota
+                        </span>
+                    </h3>
+                    <div id="admin-attendance-register-list" class="space-y-4">
                         <!-- Rendered by JS -->
                     </div>
                 </div>
@@ -1289,40 +1307,43 @@
         </div>
     </div>
 
-    <!-- INTERACTIVE WALKTHROUGH TUTORIAL MODAL -->
-    <div id="modal-tutorial" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-luma-card border-2 border-sky-500/80 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 relative overflow-hidden animate-scale-up">
+    <!-- INTERACTIVE WALKTHROUGH TUTORIAL FLOATING INFO BOX -->
+    <div id="modal-tutorial" class="hidden fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 max-w-md w-full pointer-events-auto animate-slide-up">
+        <div class="bg-luma-card/95 backdrop-blur-xl border-2 border-sky-500 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-sky-500/20 space-y-4 relative overflow-hidden">
+            <!-- Decorative accent bar -->
+            <div class="h-1 bg-gradient-to-r from-sky-500 via-indigo-500 to-luma-500 -mt-5 -mx-6 mb-3"></div>
+
             <!-- Header step info -->
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
                 <div class="flex items-center gap-2.5">
-                    <span id="tutorial-step-icon" class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-sm">
+                    <span id="tutorial-step-icon" class="w-8 h-8 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-sm">
                         <i class="fa-solid fa-compass"></i>
                     </span>
-                    <h3 id="tutorial-step-title" class="text-lg font-bold text-white">Portal Orientation</h3>
+                    <h3 id="tutorial-step-title" class="text-base font-bold text-white">Portal Orientation</h3>
                 </div>
-                <span id="tutorial-step-badge" class="px-2.5 py-1 bg-sky-500/20 text-sky-400 text-xs font-bold rounded-lg border border-sky-500/30">Step 1 of 5</span>
+                <span id="tutorial-step-badge" class="px-2.5 py-1 bg-sky-500/20 text-sky-400 text-[11px] font-extrabold rounded-lg border border-sky-500/30">Step 1 of 7</span>
             </div>
 
             <!-- Description Body -->
-            <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-2">
+            <div class="bg-slate-950/90 p-4 rounded-2xl border border-slate-800 space-y-2">
                 <p id="tutorial-step-desc" class="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                    Welcome to Luma Oportal! Let's take a quick guided tour to show you how each feature and module works.
+                    Welcome to Luma Oportal! Let's take a quick guided tour to show you how each feature works.
                 </p>
-                <p id="tutorial-step-sub" class="text-[11px] text-sky-400 font-medium">
-                    Tip: You can replay this walkthrough anytime from the Settings menu.
+                <p id="tutorial-step-sub" class="text-[11px] text-sky-400 font-medium flex items-center gap-1">
+                    <i class="fa-solid fa-lightbulb text-amber-400"></i> <span id="tutorial-step-sub-text">Notice the highlighted page box on your screen!</span>
                 </p>
             </div>
 
             <!-- Footer navigation buttons -->
-            <div class="flex items-center justify-between pt-2">
-                <button id="tutorial-btn-prev" onclick="app.prevTutorialStep()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
-                    <i class="fa-solid fa-arrow-left"></i> Previous
+            <div class="flex items-center justify-between pt-1">
+                <button id="tutorial-btn-prev" onclick="app.prevTutorialStep()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left"></i> Back
                 </button>
                 <div class="flex items-center gap-2">
-                    <button onclick="app.skipTutorial()" class="px-3.5 py-2 text-slate-400 hover:text-white text-xs font-semibold">
+                    <button onclick="app.skipTutorial()" class="px-3 py-2 text-slate-400 hover:text-white text-xs font-semibold">
                         Skip
                     </button>
-                    <button id="tutorial-btn-next" onclick="app.nextTutorialStep()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center gap-1.5">
+                    <button id="tutorial-btn-next" onclick="app.nextTutorialStep()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center gap-1.5">
                         Next <i class="fa-solid fa-arrow-right"></i>
                     </button>
                 </div>

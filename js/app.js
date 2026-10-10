@@ -585,8 +585,8 @@ class LumaApp {
         const userRoleEl = document.getElementById('dash-user-role');
         if (userRoleEl) userRoleEl.textContent = user.role;
 
-        // Calculate attended flight allocations
-        const attendedCount = db.data.allocations.filter(a => a.userId === user.id && a.status === 'Attending').length;
+        // Calculate attended flight allocations (verified by Admin)
+        const attendedCount = db.data.allocations.filter(a => a.userId === user.id && a.status === 'Attending' && a.attendanceVerified === 'Present').length;
 
         // Render quota widget
         const quotaEl = document.getElementById('dash-quota-status');
@@ -670,28 +670,60 @@ class LumaApp {
         this.tutorialStep = 0;
         this.tutorialSteps = [
             {
+                page: 'dashboard',
+                targetId: 'dash-quota-card',
                 title: "Welcome to Luma Oportal",
                 icon: "fa-solid fa-plane-departure",
-                desc: "Welcome aboard! Luma Oportal is your official command hub for managing flight duties, shift attendance, leave requests, and performance tracking.",
-                sub: "Let's take a quick guided tour to show you around."
+                desc: "Welcome aboard! On your main Dashboard Hub, you can view your greeting, active role status, and weekly flight quota progress.",
+                sub: "Notice the highlighted box on your screen! Completing 3 verified flights satisfies your weekly quota."
             },
             {
-                title: "Calendar & Allocations",
+                page: 'calendar',
+                targetId: 'page-calendar',
+                title: "Interactive Flight Calendar",
                 icon: "fa-solid fa-calendar-days",
-                desc: "Use the Calendar and Allocations modules to view scheduled Roblox flights. Here you can claim duty positions (Cabin Crew, Captain, Security) and record shift attendance.",
-                sub: "Tip: Completing 3 flight allocations per week satisfies your weekly quota!"
+                desc: "On the Calendar page, browse scheduled Roblox flights on an interactive monthly grid. Click any date to register attendance or submit absence reasons.",
+                sub: "Flight schedules automatically sync across all staff devices in real time."
             },
             {
-                title: "LOA & Consequence Tracking",
-                icon: "fa-solid fa-clipboard-check",
-                desc: "Need time off? Submit a Leave of Absence (LOA) request. You can also view your active activity status and review any assigned consequences or detention notices.",
-                sub: "All LOA requests are reviewed and approved by Admins in real time."
+                page: 'allocations',
+                targetId: 'page-allocations',
+                title: "Duty Allocations Module",
+                icon: "fa-solid fa-clipboard-user",
+                desc: "Allocate your duty role (Cabin Crew, Captain, First Officer, Security) for upcoming flights. Once allocated, an Admin can verify your attendance to credit your quota.",
+                sub: "Claim your duty position before flight departure!"
             },
             {
-                title: "Support, Reports & Customization",
+                page: 'loa',
+                targetId: 'page-loa',
+                title: "Leave of Absence (LOA)",
+                icon: "fa-solid fa-plane-slash",
+                desc: "Submit LOA or Reduced Activity requests when you cannot fulfill shift quotas due to real-life commitments.",
+                sub: "Active LOAs temporarily adjust your weekly quota requirements."
+            },
+            {
+                page: 'consequences',
+                targetId: 'page-consequences',
+                title: "Consequences & Standing",
+                icon: "fa-solid fa-gavel",
+                desc: "Review your active account standing, warning point history (C1-C3), and C4 detention schedules.",
+                sub: "Maintaining good flight attendance keeps your record clear!"
+            },
+            {
+                page: 'reports',
+                targetId: 'page-reports',
+                title: "Staff Incident Reporting",
+                icon: "fa-solid fa-shield-cat",
+                desc: "File official staff reports regarding policy violations or moderation issues for review by Head Admins.",
+                sub: "All reports are handled with confidentiality."
+            },
+            {
+                page: 'dashboard',
+                targetId: 'top-navbar',
+                title: "Settings & Customization",
                 icon: "fa-solid fa-sliders",
-                desc: "File staff reports, open support tickets for assistance, or click Settings in the top right to customize your display name, theme (Light/Dark mode), and live local clock.",
-                sub: "You can replay this walkthrough anytime from the Settings menu!"
+                desc: "Use the top navigation bar to access Settings, change display name, switch between Light and Dark mode, toggle top-bar clock, or replay this walkthrough anytime!",
+                sub: "You can replay this walkthrough anytime from the Settings menu."
             }
         ];
 
@@ -703,6 +735,27 @@ class LumaApp {
     renderTutorialStep() {
         const step = this.tutorialSteps ? this.tutorialSteps[this.tutorialStep] : null;
         if (!step) return;
+
+        // Clear previous highlights
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+
+        // Navigate to step page
+        if (step.page) {
+            this.navigateTo(step.page);
+        }
+
+        // Highlight target element on page
+        if (step.targetId) {
+            setTimeout(() => {
+                const targetEl = document.getElementById(step.targetId);
+                if (targetEl) {
+                    targetEl.classList.add('tutorial-highlight');
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
 
         const iconEl = document.getElementById('tutorial-step-icon');
         if (iconEl) iconEl.innerHTML = `<i class="${step.icon}"></i>`;
@@ -716,8 +769,8 @@ class LumaApp {
         const descEl = document.getElementById('tutorial-step-desc');
         if (descEl) descEl.textContent = step.desc;
 
-        const subEl = document.getElementById('tutorial-step-sub');
-        if (subEl) subEl.textContent = step.sub;
+        const subTextEl = document.getElementById('tutorial-step-sub-text');
+        if (subTextEl) subTextEl.textContent = step.sub;
 
         const prevBtn = document.getElementById('tutorial-btn-prev');
         const nextBtn = document.getElementById('tutorial-btn-next');
@@ -734,7 +787,7 @@ class LumaApp {
             if (this.tutorialStep === this.tutorialSteps.length - 1) {
                 nextBtn.innerHTML = `Finish Walkthrough <i class="fa-solid fa-check ml-1"></i>`;
             } else {
-                nextBtn.innerHTML = `Next Step <i class="fa-solid fa-arrow-right ml-1"></i>`;
+                nextBtn.innerHTML = `Next <i class="fa-solid fa-arrow-right ml-1"></i>`;
             }
         }
     }
@@ -760,12 +813,18 @@ class LumaApp {
     }
 
     completeTutorial() {
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+
         const modal = document.getElementById('modal-tutorial');
         if (modal) modal.classList.add('hidden');
 
         if (db.currentUser && !db.currentUser.tutorialCompleted) {
             db.completeUserTutorial(db.currentUser.id);
         }
+
+        this.navigateTo('dashboard');
     }
 
     /**
@@ -1464,6 +1523,7 @@ class LumaApp {
         this.renderAdminRequests();
         this.renderAdminRoster();
         this.renderAdminC4Register();
+        this.renderAdminAttendanceRegister();
         this.populateAdminLogStaffDropdown();
         this.renderAdminFlights();
         this.renderAdminReports();
@@ -1471,7 +1531,7 @@ class LumaApp {
     }
 
     switchAdminTab(tab) {
-        const sections = ['requests', 'roster', 'c4register', 'logconsequence', 'flights', 'reports', 'tickets'];
+        const sections = ['requests', 'roster', 'c4register', 'attendance', 'logconsequence', 'flights', 'reports', 'tickets'];
         sections.forEach(s => {
             const sec = document.getElementById(`admin-section-${s}`);
             if (sec) sec.classList.add('hidden');
@@ -1486,7 +1546,86 @@ class LumaApp {
         if (targetBtn) targetBtn.className = "px-4 py-2 rounded-lg text-xs font-bold transition-all bg-amber-500 text-slate-950 shadow-md";
 
         if (tab === 'c4register') this.renderAdminC4Register();
+        if (tab === 'attendance') this.renderAdminAttendanceRegister();
         if (tab === 'logconsequence') this.populateAdminLogStaffDropdown();
+    }
+
+    /**
+     * Render Staff Flight Attendance Register (Admin Verification)
+     */
+    renderAdminAttendanceRegister() {
+        const container = document.getElementById('admin-attendance-register-list');
+        if (!container) return;
+
+        const attendingAllocations = db.data.allocations.filter(a => a.status === 'Attending');
+
+        if (attendingAllocations.length === 0) {
+            container.innerHTML = `<p class="text-slate-500 text-xs text-center py-8">No staff members have allocated as present for upcoming flights yet.</p>`;
+            return;
+        }
+
+        container.innerHTML = attendingAllocations.map(a => {
+            const flight = db.data.flights.find(f => f.id === a.flightId) || { code: 'FLIGHT', airport: 'Airport', date: 'TBD', time: 'TBD' };
+            const verified = a.attendanceVerified;
+
+            let badgeHtml = `<span class="px-2.5 py-1 rounded text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30"><i class="fa-solid fa-hourglass-half mr-1"></i> Pending Verification</span>`;
+            if (verified === 'Present') {
+                badgeHtml = `<span class="px-2.5 py-1 rounded text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"><i class="fa-solid fa-check-circle mr-1"></i> Verified Present (Credited to Quota)</span>`;
+            } else if (verified === 'Absent') {
+                badgeHtml = `<span class="px-2.5 py-1 rounded text-[10px] font-extrabold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/30"><i class="fa-solid fa-times-circle mr-1"></i> Verified Absent</span>`;
+            }
+
+            return `
+                <div class="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <span class="px-3 py-1 bg-sky-600/30 text-sky-300 font-extrabold text-xs rounded-lg border border-sky-500/30">${flight.code}</span>
+                            <h4 class="text-base font-bold text-white">${a.userName}</h4>
+                            ${badgeHtml}
+                        </div>
+                        <p class="text-xs text-slate-300"><strong>Allocated Duty Role:</strong> <span class="text-sky-400 font-semibold">${a.role}</span> | <strong>Airport:</strong> ${flight.airport}</p>
+                        <p class="text-xs text-slate-400"><strong>Flight Date & Time:</strong> ${flight.date} @ ${flight.time}</p>
+                        ${a.verifiedBy ? `<p class="text-[11px] text-slate-500">Verified by ${a.verifiedBy} at ${new Date(a.verifiedAt).toLocaleTimeString()}</p>` : ''}
+                    </div>
+
+                    <div class="flex items-center gap-2 w-full md:w-auto">
+                        <button onclick="app.markFlightAttendance('${a.id}', 'Present')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-check"></i> Mark Present
+                        </button>
+                        <button onclick="app.markFlightAttendance('${a.id}', 'Absent')" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-xmark"></i> Mark Absent
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    markFlightAttendance(allocId, verifiedStatus) {
+        const adminUser = db.currentUser;
+        if (!adminUser || !['Head Admin', 'Admin'].includes(adminUser.role)) return;
+
+        const res = db.markAllocationAttendance(allocId, verifiedStatus, `${adminUser.preferredName} (${adminUser.role})`);
+        if (!res) return;
+
+        if (verifiedStatus === 'Present') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Attendance Verified Present',
+                text: `Marked ${res.userName} as Present. Flight credited to their weekly quota!`,
+                timer: 2500
+            });
+        } else {
+            Swal.fire({
+                icon: 'info',
+                title: 'Marked Absent',
+                text: `Marked ${res.userName} as Absent for this flight allocation.`,
+                timer: 2500
+            });
+        }
+
+        this.renderAdminAttendanceRegister();
+        this.onRealtimeSync();
     }
 
     renderAdminC4Register() {

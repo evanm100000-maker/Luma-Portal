@@ -467,6 +467,16 @@ class LumaDB {
         return alloc;
     }
 
+    markAllocationAttendance(allocId, verifiedStatus, adminName) {
+        const alloc = this.data.allocations.find(a => a.id === allocId);
+        if (!alloc) return null;
+        alloc.attendanceVerified = verifiedStatus; // 'Present' or 'Absent'
+        alloc.verifiedBy = adminName;
+        alloc.verifiedAt = new Date().toISOString();
+        this.save();
+        return alloc;
+    }
+
     // --- LOA & REDUCED ACTIVITY METHODS ---
 
     submitLOARequest(requestData) {

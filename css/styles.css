@@ -166,3 +166,12 @@ body.light-mode .text-slate-400 {
 body.light-mode .border-slate-800 {
     border-color: #cbd5e1 !important;
 }
+
+/* Interactive Onboarding Tutorial Highlight Spotlight */
+.tutorial-highlight {
+    outline: 3px solid #38bdf8 !important;
+    outline-offset: 4px !important;
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.75) !important;
+    transition: all 0.3s ease-in-out !important;
+    z-index: 45 !important;
+}
