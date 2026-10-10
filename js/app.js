@@ -10,6 +10,8 @@ class LumaApp {
         this.statsChart = null;
         this.suspensionTimerInterval = null;
         this.uploadedImageBase64 = null;
+        this.expandedAccordionIds = new Set();
+        this.lastSyncedStateHash = null;
     }
 
     /**
@@ -309,7 +311,7 @@ class LumaApp {
         return ids.includes(alertId);
     }
 
-    onRealtimeSync() {
+    onRealtimeSync(force = false) {
         if (!db.currentUser) return;
 
         // Immediate Realtime Account Lockout Enforcement for Suspended Users
@@ -340,6 +342,13 @@ class LumaApp {
                 this.dismissEmergencyAlert(false);
             }
         }
+
+        // Smart Hash Check: Prevent re-rendering active DOM screens during periodic heartbeat if data hasn't mutated
+        const currentHash = db.data ? JSON.stringify(db.data) : '';
+        if (!force && currentHash && currentHash === this.lastSyncedStateHash) {
+            return;
+        }
+        this.lastSyncedStateHash = currentHash;
 
         // Update active screen elements dynamically
         const activeScreenId = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin']
@@ -2074,10 +2083,14 @@ class LumaApp {
         const select = document.getElementById('admin-log-target-user');
         if (!select) return;
 
+        const currentValue = select.value;
         const approvedUsers = db.data.users.filter(u => u.status === 'Approved' || u.status === 'Suspended');
-        let html = `<option value="" disabled selected>-- Select Target Staff Member --</option>`;
-        html += approvedUsers.map(u => `<option value="${u.id}">${u.preferredName} (${u.robloxUser}) - ${u.email}</option>`).join('');
+        let html = `<option value="" disabled ${!currentValue ? 'selected' : ''}>-- Select Target Staff Member --</option>`;
+        html += approvedUsers.map(u => `<option value="${u.id}" ${u.id === currentValue ? 'selected' : ''}>${u.preferredName} (${u.robloxUser}) - ${u.email}</option>`).join('');
         select.innerHTML = html;
+        if (currentValue) {
+            select.value = currentValue;
+        }
         this.toggleAdminLogFields();
     }
 
@@ -2239,6 +2252,7 @@ class LumaApp {
     renderAdminConsequenceAccordion() {
         const container = document.getElementById('admin-staff-consequences-accordion');
         if (!container) return;
+        if (!this.expandedAccordionIds) this.expandedAccordionIds = new Set();
 
         const staffUsers = db.data.users.filter(u => u.status === 'Approved' || u.status === 'Suspended');
         const allConsequences = db.data.consequences || [];
@@ -2253,6 +2267,7 @@ class LumaApp {
                 c.userId === u.id || 
                 (c.userName && c.userName.toLowerCase().trim() === u.preferredName.toLowerCase().trim())
             );
+            const isExpanded = this.expandedAccordionIds.has(u.id);
 
             return `
                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden transition-all shadow-md">
@@ -2280,12 +2295,12 @@ class LumaApp {
                             }">
                                 ${userCsqs.length} ${userCsqs.length === 1 ? 'Consequence' : 'Consequences'}
                             </span>
-                            <i id="accordion-icon-${u.id}" class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-200"></i>
+                            <i id="accordion-icon-${u.id}" class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}"></i>
                         </div>
                     </button>
 
                     <!-- Dropdown Consequences List -->
-                    <div id="consequence-accordion-${u.id}" class="hidden p-4 bg-slate-950/80 border-t border-slate-800/80 space-y-3">
+                    <div id="consequence-accordion-${u.id}" class="${isExpanded ? '' : 'hidden'} p-4 bg-slate-950/80 border-t border-slate-800/80 space-y-3">
                         ${userCsqs.length === 0 ? `
                             <p class="text-xs text-slate-500 italic py-2">Clean Record — No consequences or disciplinary actions logged on file.</p>
                         ` : userCsqs.map(c => `
@@ -2314,14 +2329,17 @@ class LumaApp {
         const dropdown = document.getElementById(`consequence-accordion-${userId}`);
         const icon = document.getElementById(`accordion-icon-${userId}`);
         if (!dropdown) return;
+        if (!this.expandedAccordionIds) this.expandedAccordionIds = new Set();
 
         const isHidden = dropdown.classList.contains('hidden');
         if (isHidden) {
             dropdown.classList.remove('hidden');
             if (icon) icon.classList.add('rotate-180');
+            this.expandedAccordionIds.add(userId);
         } else {
             dropdown.classList.add('hidden');
             if (icon) icon.classList.remove('rotate-180');
+            this.expandedAccordionIds.delete(userId);
         }
     }
 
