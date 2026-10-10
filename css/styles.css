@@ -133,3 +133,36 @@ body {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+/* Light Mode Theme Overrides */
+body.light-mode {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+body.light-mode #top-navbar {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+}
+body.light-mode .bg-luma-card {
+    background-color: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+body.light-mode .bg-slate-900,
+body.light-mode .bg-slate-950,
+body.light-mode .bg-slate-900\/90,
+body.light-mode .bg-slate-950\/80 {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+}
+body.light-mode .text-slate-100,
+body.light-mode .text-white {
+    color: #0f172a !important;
+}
+body.light-mode .text-slate-300,
+body.light-mode .text-slate-400 {
+    color: #475569 !important;
+}
+body.light-mode .border-slate-800 {
+    border-color: #cbd5e1 !important;
+}

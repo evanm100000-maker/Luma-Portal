@@ -62,16 +62,27 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold tracking-wider text-white">LUMA OPORTAL</h1>
-                    <p class="text-xs text-sky-400 font-medium tracking-widest uppercase">Roblox Staff Hub</p>
+                    <p class="text-xs text-slate-300 font-medium tracking-widest uppercase">Roblox Staff Hub</p>
                 </div>
             </div>
 
             <!-- Header Quick Actions & User Info -->
             <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <!-- Live Local Clock Display -->
+                <div id="nav-live-clock" class="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-300">
+                    <i class="fa-regular fa-clock text-sky-400"></i>
+                    <span id="clock-display">Sat, Oct 10 • 14:26:46</span>
+                </div>
+
                 <!-- User Status Badges -->
                 <div id="nav-user-badges" class="hidden sm:flex items-center gap-2">
                     <!-- Badges populated by JS -->
                 </div>
+
+                <!-- Settings Button -->
+                <button onclick="app.openSettingsModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-all" title="User Preferences & Settings">
+                    <i class="fa-solid fa-gear text-sky-400"></i> <span class="hidden md:inline">Settings</span>
+                </button>
 
                 <!-- Admin Panel Button (If Admin) -->
                 <button id="nav-admin-btn" onclick="app.navigateTo('admin')" class="hidden px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-md transition-all">
@@ -225,7 +236,7 @@
                 <div class="space-y-2 relative z-10">
                     <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
-                            Hello, <span id="dash-user-name" class="text-sky-400 font-extrabold">Staff Member</span>
+                            <span id="dash-greeting-word">Morning</span>, <span id="dash-user-name">Staff Member</span>
                         </h2>
                         <span id="dash-user-role" class="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
                             Staff
@@ -1222,6 +1233,100 @@
             <button onclick="app.dismissEmergencyAlert()" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-red-600/50 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
                 <i class="fa-solid fa-bell-slash"></i> Dismiss Alert
             </button>
+        </div>
+    </div>
+
+    <!-- MODAL: USER SETTINGS -->
+    <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 animate-scale-up">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-sky-400"></i> User Preferences & Settings
+                </h3>
+                <button onclick="app.closeSettingsModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form onsubmit="app.saveUserSettings(event)" class="space-y-4">
+                <!-- Preferred Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Preferred Name</label>
+                    <input type="text" id="settings-preferred-name" required class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-white outline-none">
+                </div>
+
+                <!-- Theme Selection (Light / Dark Mode) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Portal Theme</label>
+                    <select id="settings-theme" class="w-full bg-slate-900 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-white outline-none">
+                        <option value="dark">Dark Mode (Default Aviation)</option>
+                        <option value="light">Light Mode (Clean Bright)</option>
+                    </select>
+                </div>
+
+                <!-- Live Clock Toggle -->
+                <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <div>
+                        <p class="text-xs font-semibold text-white">Top Bar Live Clock</p>
+                        <p class="text-[10px] text-slate-400">Display current date & time in your local timezone</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="settings-show-clock" class="sr-only peer" checked>
+                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                    </label>
+                </div>
+
+                <!-- Interactive Tutorial Replay -->
+                <div class="pt-2 border-t border-slate-800">
+                    <button type="button" onclick="app.closeSettingsModal(); app.startInteractiveTutorial();" class="w-full py-2 bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white border border-sky-500/30 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-graduation-cap"></i> Replay Onboarding Walkthrough
+                    </button>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="app.closeSettingsModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-lg">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- INTERACTIVE WALKTHROUGH TUTORIAL MODAL -->
+    <div id="modal-tutorial" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-luma-card border-2 border-sky-500/80 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 relative overflow-hidden animate-scale-up">
+            <!-- Header step info -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span id="tutorial-step-icon" class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-compass"></i>
+                    </span>
+                    <h3 id="tutorial-step-title" class="text-lg font-bold text-white">Portal Orientation</h3>
+                </div>
+                <span id="tutorial-step-badge" class="px-2.5 py-1 bg-sky-500/20 text-sky-400 text-xs font-bold rounded-lg border border-sky-500/30">Step 1 of 5</span>
+            </div>
+
+            <!-- Description Body -->
+            <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-2">
+                <p id="tutorial-step-desc" class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                    Welcome to Luma Oportal! Let's take a quick guided tour to show you how each feature and module works.
+                </p>
+                <p id="tutorial-step-sub" class="text-[11px] text-sky-400 font-medium">
+                    Tip: You can replay this walkthrough anytime from the Settings menu.
+                </p>
+            </div>
+
+            <!-- Footer navigation buttons -->
+            <div class="flex items-center justify-between pt-2">
+                <button id="tutorial-btn-prev" onclick="app.prevTutorialStep()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left"></i> Previous
+                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="app.skipTutorial()" class="px-3.5 py-2 text-slate-400 hover:text-white text-xs font-semibold">
+                        Skip
+                    </button>
+                    <button id="tutorial-btn-next" onclick="app.nextTutorialStep()" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center gap-1.5">
+                        Next <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

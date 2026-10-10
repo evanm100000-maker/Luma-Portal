@@ -257,6 +257,32 @@ class LumaDB {
         }
     }
 
+    updateUserSettings(userId, { preferredName, theme, showClock }) {
+        const user = this.data.users.find(u => u.id === userId);
+        if (user) {
+            if (preferredName) user.preferredName = preferredName;
+            if (theme) user.theme = theme;
+            user.showClock = showClock;
+            if (this.currentUser && this.currentUser.id === userId) {
+                this.currentUser = user;
+            }
+            this.save();
+        }
+        return user;
+    }
+
+    completeUserTutorial(userId) {
+        const user = this.data.users.find(u => u.id === userId);
+        if (user) {
+            user.tutorialCompleted = true;
+            if (this.currentUser && this.currentUser.id === userId) {
+                this.currentUser = user;
+            }
+            this.save();
+        }
+        return user;
+    }
+
     broadcastEmergencyAlert(message, senderName) {
         const alertObj = {
             id: 'alert_' + Date.now(),

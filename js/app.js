@@ -36,6 +36,47 @@ class LumaApp {
     }
 
     /**
+     * Live Local Clock in Top Bar
+     */
+    startLiveClock() {
+        const clockEl = document.getElementById('nav-live-clock');
+        const displayEl = document.getElementById('clock-display');
+        if (!clockEl || !displayEl) return;
+
+        if (this.clockInterval) clearInterval(this.clockInterval);
+
+        const updateClock = () => {
+            const user = db.currentUser;
+            const clockEnabled = user ? (user.showClock !== false) : true;
+            if (!clockEnabled) {
+                clockEl.classList.add('hidden');
+                return;
+            }
+            clockEl.classList.remove('hidden');
+
+            const now = new Date();
+            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            displayEl.textContent = now.toLocaleString([], options).replace(',', ' •');
+        };
+
+        updateClock();
+        this.clockInterval = setInterval(updateClock, 1000);
+    }
+
+    /**
+     * Apply user theme (Light/Dark mode)
+     */
+    applyUserTheme() {
+        const user = db.currentUser;
+        const theme = user ? (user.theme || 'dark') : 'dark';
+        if (theme === 'light') {
+            document.body.classList.add('light-mode');
+        } else {
+            document.body.classList.remove('light-mode');
+        }
+    }
+
+    /**
      * Check active session status and show corresponding viewport view
      */
     checkAuth() {
@@ -51,6 +92,10 @@ class LumaApp {
             this.hideAllPages();
             return;
         }
+
+        // Apply theme & start local clock
+        this.applyUserTheme();
+        this.startLiveClock();
 
         // Check if user is suspended (C5)
         if (user.status === 'Suspended') {
@@ -84,6 +129,11 @@ class LumaApp {
 
         // Default to Dashboard view
         this.navigateTo('dashboard');
+
+        // Trigger first-time login tutorial walkthrough if not completed
+        if (user && !user.tutorialCompleted) {
+            setTimeout(() => this.startInteractiveTutorial(), 600);
+        }
     }
 
     /**
@@ -518,8 +568,22 @@ class LumaApp {
      */
     renderDashboard() {
         const user = db.currentUser;
-        document.getElementById('dash-user-name').textContent = user.preferredName;
-        document.getElementById('dash-user-role').textContent = user.role;
+        
+        // Dynamic time-of-day greeting based on user's local timezone
+        const hour = new Date().getHours();
+        let greetingWord = "Morning";
+        if (hour >= 12 && hour < 17) greetingWord = "Afternoon";
+        else if (hour >= 17 && hour < 21) greetingWord = "Evening";
+        else if (hour >= 21 || hour < 5) greetingWord = "Night";
+
+        const greetingWordEl = document.getElementById('dash-greeting-word');
+        if (greetingWordEl) greetingWordEl.textContent = greetingWord;
+
+        const userNameEl = document.getElementById('dash-user-name');
+        if (userNameEl) userNameEl.textContent = user.preferredName;
+
+        const userRoleEl = document.getElementById('dash-user-role');
+        if (userRoleEl) userRoleEl.textContent = user.role;
 
         // Calculate attended flight allocations
         const attendedCount = db.data.allocations.filter(a => a.userId === user.id && a.status === 'Attending').length;
@@ -538,6 +602,170 @@ class LumaApp {
 
         // Check if consequence alert popup applies for LOA/Reduced Activity user
         this.checkLOAConsequenceNotice(user);
+    }
+
+    // --- USER PREFERENCES & SETTINGS CONTROLLER ---
+
+    openSettingsModal() {
+        const user = db.currentUser;
+        if (!user) return;
+
+        const nameInput = document.getElementById('settings-preferred-name');
+        if (nameInput) nameInput.value = user.preferredName || '';
+
+        const themeSelect = document.getElementById('settings-theme');
+        if (themeSelect) themeSelect.value = user.theme || 'dark';
+
+        const clockToggle = document.getElementById('settings-show-clock');
+        if (clockToggle) clockToggle.checked = user.showClock !== false;
+
+        const modal = document.getElementById('modal-settings');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    closeSettingsModal() {
+        const modal = document.getElementById('modal-settings');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    saveUserSettings(e) {
+        e.preventDefault();
+        const user = db.currentUser;
+        if (!user) return;
+
+        const preferredName = document.getElementById('settings-preferred-name').value.trim();
+        const theme = document.getElementById('settings-theme').value;
+        const showClock = document.getElementById('settings-show-clock').checked;
+
+        if (!preferredName) {
+            Swal.fire('Error', 'Preferred Name cannot be empty.', 'error');
+            return;
+        }
+
+        db.updateUserSettings(user.id, { preferredName, theme, showClock });
+        this.applyUserTheme();
+        this.renderNavUserBadges(db.currentUser);
+        this.startLiveClock();
+
+        const dashScreen = document.getElementById('dashboard-screen');
+        if (dashScreen && !dashScreen.classList.contains('hidden')) {
+            this.renderDashboard();
+        }
+
+        this.closeSettingsModal();
+        Swal.fire({
+            icon: 'success',
+            title: 'Settings Saved',
+            text: 'Your user preferences have been updated.',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000
+        });
+    }
+
+    // --- INTERACTIVE ONBOARDING WALKTHROUGH TUTORIAL CONTROLLER ---
+
+    startInteractiveTutorial() {
+        this.tutorialStep = 0;
+        this.tutorialSteps = [
+            {
+                title: "Welcome to Luma Oportal",
+                icon: "fa-solid fa-plane-departure",
+                desc: "Welcome aboard! Luma Oportal is your official command hub for managing flight duties, shift attendance, leave requests, and performance tracking.",
+                sub: "Let's take a quick guided tour to show you around."
+            },
+            {
+                title: "Calendar & Allocations",
+                icon: "fa-solid fa-calendar-days",
+                desc: "Use the Calendar and Allocations modules to view scheduled Roblox flights. Here you can claim duty positions (Cabin Crew, Captain, Security) and record shift attendance.",
+                sub: "Tip: Completing 3 flight allocations per week satisfies your weekly quota!"
+            },
+            {
+                title: "LOA & Consequence Tracking",
+                icon: "fa-solid fa-clipboard-check",
+                desc: "Need time off? Submit a Leave of Absence (LOA) request. You can also view your active activity status and review any assigned consequences or detention notices.",
+                sub: "All LOA requests are reviewed and approved by Admins in real time."
+            },
+            {
+                title: "Support, Reports & Customization",
+                icon: "fa-solid fa-sliders",
+                desc: "File staff reports, open support tickets for assistance, or click Settings in the top right to customize your display name, theme (Light/Dark mode), and live local clock.",
+                sub: "You can replay this walkthrough anytime from the Settings menu!"
+            }
+        ];
+
+        const modal = document.getElementById('modal-tutorial');
+        if (modal) modal.classList.remove('hidden');
+        this.renderTutorialStep();
+    }
+
+    renderTutorialStep() {
+        const step = this.tutorialSteps ? this.tutorialSteps[this.tutorialStep] : null;
+        if (!step) return;
+
+        const iconEl = document.getElementById('tutorial-step-icon');
+        if (iconEl) iconEl.innerHTML = `<i class="${step.icon}"></i>`;
+
+        const titleEl = document.getElementById('tutorial-step-title');
+        if (titleEl) titleEl.textContent = step.title;
+
+        const badgeEl = document.getElementById('tutorial-step-badge');
+        if (badgeEl) badgeEl.textContent = `Step ${this.tutorialStep + 1} of ${this.tutorialSteps.length}`;
+
+        const descEl = document.getElementById('tutorial-step-desc');
+        if (descEl) descEl.textContent = step.desc;
+
+        const subEl = document.getElementById('tutorial-step-sub');
+        if (subEl) subEl.textContent = step.sub;
+
+        const prevBtn = document.getElementById('tutorial-btn-prev');
+        const nextBtn = document.getElementById('tutorial-btn-next');
+
+        if (prevBtn) {
+            if (this.tutorialStep === 0) {
+                prevBtn.classList.add('hidden');
+            } else {
+                prevBtn.classList.remove('hidden');
+            }
+        }
+
+        if (nextBtn) {
+            if (this.tutorialStep === this.tutorialSteps.length - 1) {
+                nextBtn.innerHTML = `Finish Walkthrough <i class="fa-solid fa-check ml-1"></i>`;
+            } else {
+                nextBtn.innerHTML = `Next Step <i class="fa-solid fa-arrow-right ml-1"></i>`;
+            }
+        }
+    }
+
+    nextTutorialStep() {
+        if (this.tutorialSteps && this.tutorialStep < this.tutorialSteps.length - 1) {
+            this.tutorialStep++;
+            this.renderTutorialStep();
+        } else {
+            this.completeTutorial();
+        }
+    }
+
+    prevTutorialStep() {
+        if (this.tutorialStep > 0) {
+            this.tutorialStep--;
+            this.renderTutorialStep();
+        }
+    }
+
+    skipTutorial() {
+        this.completeTutorial();
+    }
+
+    completeTutorial() {
+        const modal = document.getElementById('modal-tutorial');
+        if (modal) modal.classList.add('hidden');
+
+        if (db.currentUser && !db.currentUser.tutorialCompleted) {
+            db.completeUserTutorial(db.currentUser.id);
+        }
     }
 
     /**
