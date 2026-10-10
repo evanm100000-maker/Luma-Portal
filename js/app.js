@@ -375,9 +375,9 @@ class LumaApp {
 
         Swal.fire({
             title: '🚨 Dispatch Emergency Alert',
-            text: 'Enter emergency broadcast message. This will IMMEDIATELY trigger an alarming popup sound on ALL staff screens:',
+            text: 'Enter emergency broadcast message to alert all staff in real time:',
             input: 'textarea',
-            inputPlaceholder: 'ATTENTION ALL CREW: Flight LM-101 moved to Gate 4. Report immediately...',
+            inputPlaceholder: 'Enter emergency broadcast message...',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             confirmButtonText: 'BROADCAST EMERGENCY ALERT'

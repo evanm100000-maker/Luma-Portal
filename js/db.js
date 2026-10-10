@@ -108,21 +108,22 @@ class LumaDB {
 
                 this.fbDB = firebase.database();
 
-                // Realtime State Sync Listener (Merge without data loss)
+                // Realtime State Sync Listener (Authoritative Cloud Sync)
                 this.fbDB.ref('portal_state').on('value', (snapshot) => {
                     const cloudData = snapshot.val();
                     if (cloudData && typeof cloudData === 'object') {
-                        // Safe merge: Preserve both local & cloud records by ID
+                        // Synchronize local state with Cloud state to support real-time deletions & updates
                         this.data = {
                             ...this.data,
-                            ...cloudData,
-                            users: this.mergeArraysById(this.data.users, cloudData.users),
-                            flights: this.mergeArraysById(this.data.flights, cloudData.flights),
-                            allocations: this.mergeArraysById(this.data.allocations, cloudData.allocations),
-                            loaRequests: this.mergeArraysById(this.data.loaRequests, cloudData.loaRequests),
-                            consequences: this.mergeArraysById(this.data.consequences, cloudData.consequences),
-                            reports: this.mergeArraysById(this.data.reports, cloudData.reports),
-                            supportTickets: this.mergeArraysById(this.data.supportTickets, cloudData.supportTickets)
+                            users: Array.isArray(cloudData.users) ? this.mergeUsersById(this.data.users, cloudData.users) : (this.data.users || []),
+                            flights: Array.isArray(cloudData.flights) ? cloudData.flights : [],
+                            allocations: Array.isArray(cloudData.allocations) ? cloudData.allocations : [],
+                            loaRequests: Array.isArray(cloudData.loaRequests) ? cloudData.loaRequests : [],
+                            consequences: Array.isArray(cloudData.consequences) ? cloudData.consequences : [],
+                            reports: Array.isArray(cloudData.reports) ? cloudData.reports : [],
+                            supportTickets: Array.isArray(cloudData.supportTickets) ? cloudData.supportTickets : [],
+                            activeWarningBanner: cloudData.activeWarningBanner !== undefined ? cloudData.activeWarningBanner : (this.data.activeWarningBanner || null),
+                            maintenanceMode: cloudData.maintenanceMode !== undefined ? cloudData.maintenanceMode : (this.data.maintenanceMode || false)
                         };
 
                         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
@@ -158,15 +159,15 @@ class LumaDB {
     }
 
     /**
-     * Merge items by ID ensuring no user, flight, or record is ever deleted during sync
+     * Merge user accounts by ID cleanly preserving local & cloud accounts
      */
-    mergeArraysById(localArr = [], cloudArr = []) {
+    mergeUsersById(localUsers = [], cloudUsers = []) {
         const map = new Map();
-        (localArr || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
-        (cloudArr || []).forEach(item => {
-            if (item && item.id) {
-                const existing = map.get(item.id);
-                map.set(item.id, existing ? { ...existing, ...item } : item);
+        (localUsers || []).forEach(u => { if (u && u.id) map.set(u.id, u); });
+        (cloudUsers || []).forEach(u => {
+            if (u && u.id) {
+                const existing = map.get(u.id);
+                map.set(u.id, existing ? { ...existing, ...u } : u);
             }
         });
         return Array.from(map.values());
