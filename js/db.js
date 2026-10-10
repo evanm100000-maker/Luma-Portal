@@ -283,6 +283,31 @@ class LumaDB {
         return user;
     }
 
+    setWarningBanner({ type, header, description, author }) {
+        const banner = {
+            id: 'banner_' + Date.now(),
+            type, // 'Warning', 'Severe warning', 'Resolved'
+            header,
+            description,
+            author,
+            createdAt: new Date().toISOString(),
+            active: true
+        };
+        this.data.activeWarningBanner = banner;
+        this.save();
+        return banner;
+    }
+
+    clearWarningBanner() {
+        this.data.activeWarningBanner = null;
+        this.save();
+    }
+
+    setMaintenanceMode(enabled) {
+        this.data.maintenanceMode = !!enabled;
+        this.save();
+    }
+
     broadcastEmergencyAlert(message, senderName) {
         const alertObj = {
             id: 'alert_' + Date.now(),

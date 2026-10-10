@@ -84,11 +84,13 @@ class LumaApp {
         const topNav = document.getElementById('top-navbar');
         const authScreen = document.getElementById('auth-screen');
         const suspensionScreen = document.getElementById('suspension-screen');
+        const maintScreen = document.getElementById('maintenance-screen');
 
         if (!user) {
             topNav.classList.add('hidden');
             authScreen.classList.remove('hidden');
             suspensionScreen.classList.add('hidden');
+            if (maintScreen) maintScreen.classList.add('hidden');
             this.hideAllPages();
             return;
         }
@@ -101,6 +103,7 @@ class LumaApp {
         if (user.status === 'Suspended') {
             topNav.classList.remove('hidden');
             authScreen.classList.add('hidden');
+            if (maintScreen) maintScreen.classList.add('hidden');
             this.hideAllPages();
             this.showSuspensionScreen(user);
             return;
@@ -119,6 +122,23 @@ class LumaApp {
             return;
         }
 
+        // Check Maintenance Lockout Mode
+        const isMaint = db.data ? !!db.data.maintenanceMode : false;
+        if (isMaint) {
+            const isAdmin = user && ['Head Admin', 'Admin'].includes(user.role);
+            const isBypassed = sessionStorage.getItem('luma_admin_bypass') === 'true';
+
+            if (!isAdmin && !isBypassed) {
+                topNav.classList.add('hidden');
+                authScreen.classList.add('hidden');
+                suspensionScreen.classList.add('hidden');
+                this.hideAllPages();
+                if (maintScreen) maintScreen.classList.remove('hidden');
+                return;
+            }
+        }
+        if (maintScreen) maintScreen.classList.add('hidden');
+
         // User is logged in & approved!
         topNav.classList.remove('hidden');
         authScreen.classList.add('hidden');
@@ -126,6 +146,10 @@ class LumaApp {
 
         // Update Top Nav user badges
         this.renderNavUserBadges(user);
+
+        // Update warning banner & maintenance status UI
+        this.renderWarningBanner();
+        this.updateMaintenanceUI();
 
         // Default to Dashboard view
         this.navigateTo('dashboard');
@@ -209,6 +233,17 @@ class LumaApp {
         }
 
         this.renderNavUserBadges(db.currentUser);
+        this.renderWarningBanner();
+        this.updateMaintenanceUI();
+
+        // Immediate Maintenance Lockout Enforcement for Non-Admin Users
+        const isMaint = db.data ? !!db.data.maintenanceMode : false;
+        const isAdmin = db.currentUser && ['Head Admin', 'Admin'].includes(db.currentUser.role);
+        const isBypassed = sessionStorage.getItem('luma_admin_bypass') === 'true';
+        if (isMaint && !isAdmin && !isBypassed) {
+            this.checkAuth();
+            return;
+        }
 
         // Check active Emergency Alert in state
         if (db.data && db.data.activeEmergencyAlert && db.data.activeEmergencyAlert.active !== false) {
@@ -381,6 +416,211 @@ class LumaApp {
         } catch (e) {
             console.error("Emergency siren audio error:", e);
         }
+    }
+
+    /**
+     * Render Warning Banner UI dynamically from state
+     */
+    renderWarningBanner() {
+        const bannerEl = document.getElementById('site-warning-banner');
+        if (!bannerEl) return;
+
+        const banner = db.data ? db.data.activeWarningBanner : null;
+        if (!banner || banner.active === false || !banner.header || !banner.description) {
+            bannerEl.classList.add('hidden');
+            return;
+        }
+
+        bannerEl.classList.remove('hidden');
+
+        const typeBadge = document.getElementById('warning-banner-type-badge');
+        const iconEl = document.getElementById('warning-banner-icon');
+        const headerEl = document.getElementById('warning-banner-header-text');
+        const descEl = document.getElementById('warning-banner-desc-text');
+        const metaEl = document.getElementById('warning-banner-meta');
+
+        if (headerEl) headerEl.textContent = banner.header;
+        if (descEl) descEl.textContent = banner.description;
+        if (metaEl) metaEl.textContent = `Posted by: ${banner.author || 'Admin Staff'}`;
+
+        bannerEl.className = "w-full rounded-2xl p-4 sm:p-5 shadow-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-slide-down relative overflow-hidden";
+
+        if (banner.type === 'Severe warning') {
+            bannerEl.classList.add('bg-rose-950/90', 'border-rose-500/60', 'text-rose-100', 'shadow-rose-950/40');
+            if (iconEl) iconEl.className = "fa-solid fa-radiation text-rose-400 text-xl animate-pulse";
+            if (typeBadge) {
+                typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30";
+                typeBadge.textContent = "SEVERE WARNING";
+            }
+        } else if (banner.type === 'Resolved') {
+            bannerEl.classList.add('bg-emerald-950/90', 'border-emerald-500/60', 'text-emerald-100', 'shadow-emerald-950/40');
+            if (iconEl) iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-xl";
+            if (typeBadge) {
+                typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                typeBadge.textContent = "RESOLVED";
+            }
+        } else { // Standard 'Warning'
+            bannerEl.classList.add('bg-amber-950/90', 'border-amber-500/60', 'text-amber-100', 'shadow-amber-950/40');
+            if (iconEl) iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-xl";
+            if (typeBadge) {
+                typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                typeBadge.textContent = "WARNING";
+            }
+        }
+    }
+
+    openWarningBannerModal() {
+        const user = db.currentUser;
+        if (!user || !['Head Admin', 'Admin'].includes(user.role)) {
+            Swal.fire('Access Denied', 'Admin privileges required to manage warning banners.', 'error');
+            return;
+        }
+        const modal = document.getElementById('modal-warning-banner');
+        if (!modal) return;
+
+        const currentBanner = db.data ? db.data.activeWarningBanner : null;
+        if (currentBanner) {
+            const typeEl = document.getElementById('warning-banner-type');
+            const headerEl = document.getElementById('warning-banner-header');
+            const descEl = document.getElementById('warning-banner-description');
+            if (typeEl) typeEl.value = currentBanner.type || 'Warning';
+            if (headerEl) headerEl.value = currentBanner.header || '';
+            if (descEl) descEl.value = currentBanner.description || '';
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    closeWarningBannerModal() {
+        const modal = document.getElementById('modal-warning-banner');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    handleDispatchWarningBanner(e) {
+        if (e) e.preventDefault();
+        const user = db.currentUser;
+        if (!user || !['Head Admin', 'Admin'].includes(user.role)) return;
+
+        const type = document.getElementById('warning-banner-type').value;
+        const header = document.getElementById('warning-banner-header').value.trim();
+        const description = document.getElementById('warning-banner-description').value.trim();
+
+        if (!header || !description) {
+            Swal.fire('Missing Information', 'Please provide both a header title and description for the warning banner.', 'warning');
+            return;
+        }
+
+        db.setWarningBanner({ type, header, description, author: user.preferredName });
+        this.closeWarningBannerModal();
+        this.renderWarningBanner();
+        Swal.fire('Warning Banner Published!', `The ${type} banner is now live across the portal for all staff.`, 'success');
+    }
+
+    clearWarningBanner() {
+        const user = db.currentUser;
+        if (!user || !['Head Admin', 'Admin'].includes(user.role)) return;
+
+        Swal.fire({
+            title: 'Clear Warning Banner?',
+            text: 'Are you sure you want to remove the site warning banner for all users?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Clear Banner'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.clearWarningBanner();
+                this.closeWarningBannerModal();
+                this.renderWarningBanner();
+                Swal.fire('Banner Cleared', 'The warning banner has been removed from the portal.', 'success');
+            }
+        });
+    }
+
+    toggleMaintenanceMode() {
+        const user = db.currentUser;
+        if (!user || !['Head Admin', 'Admin'].includes(user.role)) {
+            Swal.fire('Access Denied', 'Admin privileges required to toggle Maintenance Lockout Mode.', 'error');
+            return;
+        }
+
+        const currentlyEnabled = db.data ? !!db.data.maintenanceMode : false;
+        const nextState = !currentlyEnabled;
+
+        Swal.fire({
+            title: nextState ? '🔒 Enable Maintenance Lockout?' : '🔓 Disable Maintenance Lockout?',
+            text: nextState 
+                ? 'Enabling maintenance mode will restrict all non-admin staff members from accessing the portal until disabled.'
+                : 'Disabling maintenance mode will restore normal portal access for all staff members.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: nextState ? '#ef4444' : '#10b981',
+            confirmButtonText: nextState ? 'Enable Maintenance Mode' : 'Disable Maintenance Mode'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.setMaintenanceMode(nextState);
+                this.updateMaintenanceUI();
+                this.checkAuth();
+                Swal.fire(
+                    nextState ? 'Maintenance Lockout Active' : 'Portal Restored',
+                    nextState ? 'Portal is now locked for non-administrative users.' : 'Normal portal access restored.',
+                    'success'
+                );
+            }
+        });
+    }
+
+    updateMaintenanceUI() {
+        const btnText = document.getElementById('admin-maintenance-btn-text');
+        const btnEl = document.getElementById('admin-maintenance-toggle-btn');
+        const isMaint = db.data ? !!db.data.maintenanceMode : false;
+
+        if (btnText) {
+            btnText.textContent = isMaint ? 'Maintenance: ON' : 'Maintenance: OFF';
+        }
+        if (btnEl) {
+            if (isMaint) {
+                btnEl.className = "px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all animate-pulse";
+            } else {
+                btnEl.className = "px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-extrabold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all";
+            }
+        }
+    }
+
+    promptAdminMaintenanceBypass() {
+        Swal.fire({
+            title: '🔐 Admin Security Bypass',
+            text: 'Enter the Admin Security Password or Founder Key to bypass maintenance lockout:',
+            input: 'password',
+            inputPlaceholder: 'Enter security password...',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            confirmButtonText: 'AUTHENTICATE BYPASS'
+        }).then(async result => {
+            if (result.isConfirmed && result.value) {
+                const pass = result.value.trim();
+                const cleanPass = pass.toLowerCase();
+                let authenticated = (pass === 'MICHELLE11.' || pass === 'MICHELLE11' || cleanPass === 'michelle11.');
+                
+                if (!authenticated && typeof PROMOTION_PASSWORD_HASH !== 'undefined') {
+                    authenticated = await CryptoUtils.verifyPassword(pass, PROMOTION_PASSWORD_HASH);
+                }
+
+                if (authenticated) {
+                    sessionStorage.setItem('luma_admin_bypass', 'true');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Bypass Authenticated',
+                        text: 'Security bypass granted. Welcome to Admin Command Center.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    this.checkAuth();
+                } else {
+                    Swal.fire('Access Denied', 'Invalid security password entered.', 'error');
+                }
+            }
+        });
     }
 
     /**
