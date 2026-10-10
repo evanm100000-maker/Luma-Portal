@@ -423,7 +423,8 @@ class LumaApp {
      */
     renderWarningBanner() {
         const bannerEl = document.getElementById('site-warning-banner');
-        if (!bannerEl) return;
+        const cardEl = document.getElementById('warning-banner-card');
+        if (!bannerEl || !cardEl) return;
 
         const banner = db.data ? db.data.activeWarningBanner : null;
         if (!banner || banner.active === false || !banner.header || !banner.description) {
@@ -435,33 +436,53 @@ class LumaApp {
 
         const typeBadge = document.getElementById('warning-banner-type-badge');
         const iconEl = document.getElementById('warning-banner-icon');
-        const headerEl = document.getElementById('warning-banner-header-text');
-        const descEl = document.getElementById('warning-banner-desc-text');
+        const titleEl = document.getElementById('warning-banner-title');
+        const descEl = document.getElementById('warning-banner-desc');
         const metaEl = document.getElementById('warning-banner-meta');
+        const clearBtn = document.getElementById('warning-banner-clear-btn');
 
-        if (headerEl) headerEl.textContent = banner.header;
+        if (titleEl) titleEl.textContent = banner.header;
         if (descEl) descEl.textContent = banner.description;
-        if (metaEl) metaEl.textContent = `Posted by: ${banner.author || 'Admin Staff'}`;
+        if (metaEl) metaEl.textContent = `Issued by ${banner.author || 'Admin'} • ${banner.createdAt ? new Date(banner.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Command Center'}`;
 
-        bannerEl.className = "w-full rounded-2xl p-4 sm:p-5 shadow-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-slide-down relative overflow-hidden";
+        const user = db.currentUser;
+        if (clearBtn) {
+            if (user && ['Head Admin', 'Admin'].includes(user.role)) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        // Apply card styling based on type
+        cardEl.className = "p-4 sm:p-5 rounded-2xl border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all relative overflow-hidden";
 
         if (banner.type === 'Severe warning') {
-            bannerEl.classList.add('bg-rose-950/90', 'border-rose-500/60', 'text-rose-100', 'shadow-rose-950/40');
-            if (iconEl) iconEl.className = "fa-solid fa-radiation text-rose-400 text-xl animate-pulse";
+            cardEl.classList.add('bg-rose-950/90', 'border-rose-500/60', 'text-rose-100', 'shadow-rose-950/40');
+            if (iconEl) {
+                iconEl.className = "w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 text-lg shrink-0 animate-pulse";
+                iconEl.innerHTML = `<i class="fa-solid fa-radiation"></i>`;
+            }
             if (typeBadge) {
                 typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30";
                 typeBadge.textContent = "SEVERE WARNING";
             }
         } else if (banner.type === 'Resolved') {
-            bannerEl.classList.add('bg-emerald-950/90', 'border-emerald-500/60', 'text-emerald-100', 'shadow-emerald-950/40');
-            if (iconEl) iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-xl";
+            cardEl.classList.add('bg-emerald-950/90', 'border-emerald-500/60', 'text-emerald-100', 'shadow-emerald-950/40');
+            if (iconEl) {
+                iconEl.className = "w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg shrink-0";
+                iconEl.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+            }
             if (typeBadge) {
                 typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
                 typeBadge.textContent = "RESOLVED";
             }
         } else { // Standard 'Warning'
-            bannerEl.classList.add('bg-amber-950/90', 'border-amber-500/60', 'text-amber-100', 'shadow-amber-950/40');
-            if (iconEl) iconEl.className = "fa-solid fa-triangle-exclamation text-amber-400 text-xl";
+            cardEl.classList.add('bg-amber-950/90', 'border-amber-500/60', 'text-amber-100', 'shadow-amber-950/40');
+            if (iconEl) {
+                iconEl.className = "w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg shrink-0";
+                iconEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>`;
+            }
             if (typeBadge) {
                 typeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30";
                 typeBadge.textContent = "WARNING";
