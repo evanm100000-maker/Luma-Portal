@@ -444,9 +444,10 @@ class LumaApp {
     }
 
     /**
-     * Dismiss Emergency Alert & Stop Siren Sound Loop
+     * Dismiss Emergency Alert locally on this device & Stop Siren Sound Loop
+     * Does NOT clear alert globally for other users on the network!
      */
-    dismissEmergencyAlert(isUserClick = true) {
+    dismissEmergencyAlert() {
         const modal = document.getElementById('modal-emergency-alert');
         if (modal) modal.classList.add('hidden');
 
@@ -456,49 +457,62 @@ class LumaApp {
         if (activeId) {
             this.markAlertDismissedLocally(activeId);
         }
-
-        // When cleared/dismissed by user on device, delete alert globally for all devices immediately
-        if (isUserClick) {
-            db.clearEmergencyAlert();
-        }
     }
 
     /**
      * Web Audio API Emergency Siren Alarm Sound Generator (Continuous Dual-Tone Siren)
+     * Includes auto-resume and browser autoplay unlock handlers for guaranteed sound playback
      */
     startEmergencySynthAlarm() {
-        // Stop any existing siren instance first
-        if (this.synthOscillator) {
-            try { this.synthOscillator.stop(); } catch (e) {}
-        }
-        if (this.synthInterval) {
-            clearInterval(this.synthInterval);
-        }
+        this.stopEmergencySynthAlarm();
 
         try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+
+            const ctx = new AudioCtx();
             this.synthAudioContext = ctx;
+
+            if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+            }
 
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
 
             osc.type = 'sawtooth';
-            gain.gain.setValueAtTime(0.35, ctx.currentTime);
+            gain.gain.setValueAtTime(0.4, ctx.currentTime);
 
             osc.connect(gain);
             gain.connect(ctx.destination);
 
             let high = false;
             osc.frequency.setValueAtTime(900, ctx.currentTime);
-            osc.start();
+            osc.start(0);
 
             this.synthOscillator = osc;
             this.synthInterval = setInterval(() => {
+                if (ctx && ctx.state === 'suspended') {
+                    ctx.resume().catch(() => {});
+                }
                 high = !high;
-                if (osc && ctx && ctx.state === 'running') {
-                    osc.frequency.setValueAtTime(high ? 980 : 620, ctx.currentTime);
+                if (osc && ctx) {
+                    try {
+                        osc.frequency.setValueAtTime(high ? 980 : 620, ctx.currentTime);
+                    } catch (e) {}
                 }
             }, 250);
+
+            // User gesture unlock listener if browser initially blocked autoplay
+            const unlockAudio = () => {
+                if (this.synthAudioContext && this.synthAudioContext.state === 'suspended') {
+                    this.synthAudioContext.resume().catch(() => {});
+                }
+            };
+            window.addEventListener('click', unlockAudio, { once: false });
+            window.addEventListener('keydown', unlockAudio, { once: false });
+            window.addEventListener('touchstart', unlockAudio, { once: false });
+            window.addEventListener('pointerdown', unlockAudio, { once: false });
         } catch (e) {
             console.error("Emergency siren audio error:", e);
         }
