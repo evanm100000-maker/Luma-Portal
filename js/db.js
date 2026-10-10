@@ -695,6 +695,42 @@ class LumaDB {
             this.save();
         }
     }
+
+    // --- DELETION METHODS ---
+
+    deleteFlight(flightId) {
+        this.data.flights = this.data.flights.filter(f => f.id !== flightId);
+        this.data.allocations = this.data.allocations.filter(a => a.flightId !== flightId);
+        this.save();
+    }
+
+    deleteReport(reportId) {
+        this.data.reports = this.data.reports.filter(r => r.id !== reportId);
+        this.save();
+    }
+
+    deleteSupportTicket(ticketId) {
+        this.data.supportTickets = this.data.supportTickets.filter(t => t.id !== ticketId);
+        this.save();
+    }
+
+    deleteConsequence(consequenceId) {
+        this.data.consequences = this.data.consequences.filter(c => c.id !== consequenceId);
+        this.save();
+    }
+
+    deleteLOARequest(loaId) {
+        const req = this.data.loaRequests.find(r => r.id === loaId);
+        if (req) {
+            const user = this.data.users.find(u => u.id === req.userId);
+            if (user) {
+                user.activityStatus = 'Normal';
+                user.loaUntil = null;
+            }
+        }
+        this.data.loaRequests = this.data.loaRequests.filter(r => r.id !== loaId);
+        this.save();
+    }
 }
 
 // Instantiate global database instance

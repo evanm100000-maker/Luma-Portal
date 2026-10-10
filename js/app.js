@@ -1131,10 +1131,15 @@ class LumaApp {
                     <p class="text-xs text-slate-400 mt-1">Reason: ${r.reason}</p>
                     <p class="text-[11px] text-slate-500 mt-0.5"><i class="fa-solid fa-calendar text-amber-400 mr-1"></i> Active: ${r.startDate} to ${r.endDate}</p>
                 </div>
-                <div>
+                <div class="flex items-center gap-2">
                     <span class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold">
                         ${r.status}
                     </span>
+                    ${['Head Admin', 'Admin'].includes(user.role) || r.userId === user.id ? `
+                        <button onclick="app.deleteLOARequest('${r.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete LOA">
+                            <i class="fa-solid fa-trash-can"></i> Delete
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `).join('');
@@ -1662,6 +1667,9 @@ class LumaApp {
                     <button onclick="app.evaluateC4('${c.id}', 'Failed')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
                         <i class="fa-solid fa-times-circle"></i> Mark as Fail
                     </button>
+                    <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5" title="Delete Log">
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -1997,9 +2005,14 @@ class LumaApp {
             const absences = db.data.allocations.filter(a => a.flightId === f.id && a.status === 'Absent');
             return `
                 <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
                         <span class="px-2.5 py-1 bg-sky-500/20 text-sky-300 font-bold text-xs rounded">${f.code} - ${f.airport}</span>
-                        <span class="text-xs text-slate-400 font-bold">${f.date} @ ${f.time}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400 font-bold">${f.date} @ ${f.time}</span>
+                            <button onclick="app.deleteFlight('${f.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Flight">
+                                <i class="fa-solid fa-trash-can"></i> Delete
+                            </button>
+                        </div>
                     </div>
                     <p class="text-xs text-slate-300">Host: ${f.host} | Aircraft: ${f.aircraft}</p>
                     <!-- Absence Reasons List -->
@@ -2010,6 +2023,27 @@ class LumaApp {
                 </div>
             `;
         }).join('');
+    }
+
+    deleteFlight(flightId) {
+        const flight = db.data.flights.find(f => f.id === flightId);
+        if (!flight) return;
+
+        Swal.fire({
+            title: 'Delete Flight Schedule?',
+            text: `Are you sure you want to delete flight ${flight.code}? All associated staff allocations will be removed.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete Flight'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteFlight(flightId);
+                Swal.fire('Deleted!', `Flight ${flight.code} has been deleted.`, 'success');
+                this.renderAdminPanel();
+                this.onRealtimeSync();
+            }
+        });
     }
 
     // --- ADMIN REPORTS MODERATION ---
@@ -2025,7 +2059,7 @@ class LumaApp {
 
         container.innerHTML = reports.map(r => `
             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between flex-wrap gap-2">
                     <div>
                         <span class="font-bold text-white text-sm">Target: ${r.targetUser}</span>
                         <span class="text-xs text-slate-400 ml-2">(${r.offense})</span>
@@ -2036,12 +2070,33 @@ class LumaApp {
                             <option value="In review" ${r.status==='In review'?'selected':''}>In review</option>
                             <option value="Closed" ${r.status==='Closed'?'selected':''}>Closed</option>
                         </select>
+                        <button onclick="app.deleteReport('${r.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Report">
+                            <i class="fa-solid fa-trash-can"></i> Delete
+                        </button>
                     </div>
                 </div>
                 <p class="text-xs text-slate-300">${r.description}</p>
                 <button onclick="app.promptAdminReplyReport('${r.id}')" class="px-3 py-1 bg-sky-600 text-white text-xs font-bold rounded">Add Official Admin Reply</button>
             </div>
         `).join('');
+    }
+
+    deleteReport(reportId) {
+        Swal.fire({
+            title: 'Delete Report File?',
+            text: 'Are you sure you want to permanently delete this report record?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete Report'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteReport(reportId);
+                Swal.fire('Deleted!', 'Report record has been deleted.', 'success');
+                this.renderAdminPanel();
+                this.onRealtimeSync();
+            }
+        });
     }
 
     updateReportStatus(reportId, newStatus) {
@@ -2079,16 +2134,86 @@ class LumaApp {
         }
 
         container.innerHTML = tickets.map(t => `
-            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+            <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-2">
                 <div>
                     <h4 class="text-xs font-bold text-white">${t.subject} (${t.category})</h4>
                     <p class="text-[11px] text-slate-400">Created by: ${t.creatorName} | Assigned: ${t.assignedAdminName}</p>
                 </div>
-                <button onclick="app.navigateTo('support'); app.selectSupportTicket('${t.id}')" class="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded">
-                    Open Chat
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="app.navigateTo('support'); app.selectSupportTicket('${t.id}')" class="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded">
+                        Open Chat
+                    </button>
+                    <button onclick="app.deleteSupportTicket('${t.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Support Ticket">
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
+                </div>
             </div>
         `).join('');
+    }
+
+    deleteSupportTicket(ticketId) {
+        Swal.fire({
+            title: 'Delete Support Ticket?',
+            text: 'Are you sure you want to permanently delete this support ticket and chat log?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete Ticket'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteSupportTicket(ticketId);
+                if (this.selectedTicketId === ticketId) {
+                    this.selectedTicketId = null;
+                }
+                Swal.fire('Deleted!', 'Support ticket deleted.', 'success');
+                if (document.getElementById('page-support') && !document.getElementById('page-support').classList.contains('hidden')) {
+                    this.renderSupportPage();
+                }
+                this.renderAdminPanel();
+                this.onRealtimeSync();
+            }
+        });
+    }
+
+    deleteConsequence(consequenceId) {
+        Swal.fire({
+            title: 'Delete Consequence Log?',
+            text: 'Are you sure you want to remove this consequence record?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete Record'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteConsequence(consequenceId);
+                Swal.fire('Deleted!', 'Consequence record removed.', 'success');
+                this.renderAdminPanel();
+                if (document.getElementById('page-consequences') && !document.getElementById('page-consequences').classList.contains('hidden')) {
+                    this.renderConsequencesPage();
+                }
+                this.onRealtimeSync();
+            }
+        });
+    }
+
+    deleteLOARequest(loaId) {
+        Swal.fire({
+            title: 'Delete LOA Request?',
+            text: 'Are you sure you want to cancel and delete this LOA request?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete LOA'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteLOARequest(loaId);
+                Swal.fire('Deleted!', 'LOA request deleted and active status restored.', 'success');
+                if (document.getElementById('page-loa') && !document.getElementById('page-loa').classList.contains('hidden')) {
+                    this.renderLOAPage();
+                }
+                this.onRealtimeSync();
+            }
+        });
     }
 
     // --- ABOUT & COPYRIGHT MODALS ---
