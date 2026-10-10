@@ -165,7 +165,7 @@ class LumaDB {
                         this.data.loaRequests = this.mergePreservingDeletions(this.data.loaRequests, cloudData.loaRequests, allDeletedIds);
                         this.data.consequences = this.mergePreservingDeletions(this.data.consequences, cloudData.consequences, allDeletedIds);
                         this.data.reports = this.mergePreservingDeletions(this.data.reports, cloudData.reports, allDeletedIds);
-                        this.data.supportTickets = this.mergePreservingDeletions(this.data.supportTickets, cloudData.supportTickets);
+                        this.data.supportTickets = this.mergePreservingDeletions(this.data.supportTickets, cloudData.supportTickets, allDeletedIds);
 
                         if (cloudData.activeWarningBanner !== undefined) this.data.activeWarningBanner = cloudData.activeWarningBanner;
                         if (cloudData.maintenanceMode !== undefined) this.data.maintenanceMode = cloudData.maintenanceMode;
@@ -465,7 +465,14 @@ class LumaDB {
     }
 
     rejectUser(userId) {
-        this.data.users = this.data.users.filter(u => u.id !== userId);
+        this.trackDeletedId(userId);
+        this.data.users = (this.data.users || []).filter(u => u.id !== userId);
+        this.save();
+    }
+
+    deleteUser(userId) {
+        this.trackDeletedId(userId);
+        this.data.users = (this.data.users || []).filter(u => u.id !== userId);
         this.save();
     }
 

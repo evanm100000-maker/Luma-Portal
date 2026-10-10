@@ -2220,49 +2220,112 @@ class LumaApp {
         const container = document.getElementById('admin-roster-list');
         const approvedUsers = db.data.users.filter(u => u.status === 'Approved' || u.status === 'Suspended');
 
-        container.innerHTML = approvedUsers.map(u => `
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <h4 class="text-sm font-bold text-white">${u.preferredName} (${u.robloxUser})</h4>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                            u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
-                        }">${u.role}</span>
-                        ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> SUSPENDED</span>' : ''}
+        container.innerHTML = approvedUsers.map(u => {
+            const escapedName = (u.preferredName || '').replace(/'/g, "\\'");
+            const isSelf = db.currentUser && u.id === db.currentUser.id;
+
+            return `
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="text-sm font-bold text-white">${u.preferredName} (${u.robloxUser})</h4>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
+                            }">${u.role}</span>
+                            ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> SUSPENDED</span>' : ''}
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Discord: ${u.discordUser} | Email: ${u.email}</p>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">Discord: ${u.discordUser} | Email: ${u.email}</p>
-                </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    ${u.status === 'Suspended' ? `
-                        <button onclick="app.liftStaffSuspension('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow">
-                            <i class="fa-solid fa-unlock mr-1"></i> Lift Suspension
+                    <div class="flex flex-wrap items-center gap-2">
+                        ${u.status === 'Suspended' ? `
+                            <button onclick="app.liftStaffSuspension('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow">
+                                <i class="fa-solid fa-unlock mr-1"></i> Lift Suspension
+                            </button>
+                        ` : ''}
+
+                        <!-- Role Selector Dropdown -->
+                        ${isSelf ? `
+                            <span class="px-3 py-1.5 bg-slate-800 text-slate-400 text-xs font-bold rounded-lg flex items-center gap-1">
+                                <i class="fa-solid fa-user-check text-xs"></i> You (${u.role})
+                            </span>
+                        ` : `
+                            <select onchange="app.changeUserRolePrompt('${u.id}', this.value)" class="bg-slate-950 border border-amber-500/30 text-xs font-bold text-amber-300 rounded-lg px-2.5 py-1.5 outline-none hover:border-amber-400 transition-all cursor-pointer">
+                                <option value="Staff" ${u.role === 'Staff' ? 'selected' : ''}>Role: Staff</option>
+                                <option value="Admin" ${u.role === 'Admin' ? 'selected' : ''}>Role: Admin</option>
+                                <option value="Head Admin" ${u.role === 'Head Admin' ? 'selected' : ''}>Role: Head Admin</option>
+                            </select>
+                        `}
+
+                        <!-- Delete Account Button -->
+                        ${!isSelf ? `
+                            <button onclick="app.deleteUserAccount('${u.id}')" class="px-2.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Account">
+                                <i class="fa-solid fa-user-minus"></i> Delete
+                            </button>
+                        ` : ''}
+
+                        <!-- Force LOA -->
+                        <button onclick="app.promptForceLOA('${u.id}')" class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white border border-sky-500/30 text-xs font-bold rounded-lg">
+                            Force LOA
                         </button>
-                    ` : ''}
 
-                    <!-- Promote / Demote Button -->
-                    ${u.role === 'Head Admin' ? `
-                        <span class="px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold rounded-lg flex items-center gap-1">
-                            <i class="fa-solid fa-crown text-xs"></i> Head Admin
-                        </span>
-                    ` : `
-                        <button onclick="app.promptPromotionPassword('${u.id}', '${u.role === 'Admin' ? 'Staff' : 'Admin'}')" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-bold rounded-lg transition-all">
-                            <i class="fa-solid fa-key mr-1"></i> ${u.role === 'Admin' ? 'Demote to Staff' : 'Promote to Admin'}
+                        <!-- Issue Consequence -->
+                        <button onclick="app.openConsequenceModal('${u.id}', '${escapedName}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg shadow">
+                            Issue Consequence
                         </button>
-                    `}
-
-                    <!-- Force LOA -->
-                    <button onclick="app.promptForceLOA('${u.id}')" class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white border border-sky-500/30 text-xs font-bold rounded-lg">
-                        Force LOA
-                    </button>
-
-                    <!-- Issue Consequence -->
-                    <button onclick="app.openConsequenceModal('${u.id}', '${u.preferredName}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg shadow">
-                        Issue Consequence
-                    </button>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    changeUserRolePrompt(targetUserId, targetRole) {
+        const user = db.data.users.find(u => u.id === targetUserId);
+        if (!user) return;
+
+        Swal.fire({
+            title: `Change Role for ${user.preferredName}?`,
+            text: `Are you sure you want to change ${user.preferredName}'s privilege role to "${targetRole}"?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            confirmButtonText: `Yes, Set Role to ${targetRole}`
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.updateUserRole(targetUserId, targetRole);
+                Swal.fire('Role Updated!', `${user.preferredName}'s role has been changed to ${targetRole}.`, 'success');
+                this.renderAdminPanel();
+                this.onRealtimeSync(true);
+            } else {
+                this.renderAdminRoster();
+            }
+        });
+    }
+
+    deleteUserAccount(userId) {
+        const user = db.data.users.find(u => u.id === userId);
+        if (!user) return;
+
+        if (user.id === db.currentUser.id) {
+            Swal.fire('Cannot Delete Self', 'You cannot delete your own active account.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: `Delete Account for ${user.preferredName}?`,
+            text: `Are you sure you want to permanently delete user account "${user.preferredName} (${user.robloxUser})"? This action cannot be undone.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete Account'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.deleteUser(userId);
+                Swal.fire('Account Deleted!', `User ${user.preferredName} removed from portal database.`, 'success');
+                this.renderAdminPanel();
+                this.onRealtimeSync(true);
+            }
+        });
     }
 
     /**
@@ -2556,7 +2619,7 @@ class LumaApp {
                 db.deleteFlight(flightId);
                 Swal.fire('Deleted!', `Flight ${flight.code} has been deleted.`, 'success');
                 this.renderAdminPanel();
-                this.onRealtimeSync();
+                this.onRealtimeSync(true);
             }
         });
     }
@@ -2609,7 +2672,7 @@ class LumaApp {
                 db.deleteReport(reportId);
                 Swal.fire('Deleted!', 'Report record has been deleted.', 'success');
                 this.renderAdminPanel();
-                this.onRealtimeSync();
+                this.onRealtimeSync(true);
             }
         });
     }
@@ -2618,6 +2681,7 @@ class LumaApp {
         db.updateReportStatus(reportId, newStatus);
         Swal.fire('Report Status Updated', `Set to ${newStatus}`, 'success');
         this.renderAdminPanel();
+        this.onRealtimeSync(true);
     }
 
     promptAdminReplyReport(reportId) {
@@ -2635,6 +2699,7 @@ class LumaApp {
                 });
                 Swal.fire('Reply Added', 'Response posted on report.', 'success');
                 this.renderAdminPanel();
+                this.onRealtimeSync(true);
             }
         });
     }
@@ -2685,7 +2750,7 @@ class LumaApp {
                     this.renderSupportPage();
                 }
                 this.renderAdminPanel();
-                this.onRealtimeSync();
+                this.onRealtimeSync(true);
             }
         });
     }
@@ -2706,7 +2771,7 @@ class LumaApp {
                 if (document.getElementById('page-consequences') && !document.getElementById('page-consequences').classList.contains('hidden')) {
                     this.renderConsequencesPage();
                 }
-                this.onRealtimeSync();
+                this.onRealtimeSync(true);
             }
         });
     }
@@ -2726,7 +2791,7 @@ class LumaApp {
                 if (document.getElementById('page-loa') && !document.getElementById('page-loa').classList.contains('hidden')) {
                     this.renderLOAPage();
                 }
-                this.onRealtimeSync();
+                this.onRealtimeSync(true);
             }
         });
     }
