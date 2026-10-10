@@ -826,6 +826,9 @@
                 <button id="admin-tab-logconsequence" onclick="app.switchAdminTab('logconsequence')" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">
                     <i class="fa-solid fa-gavel mr-1.5 text-amber-400"></i> Log Consequence
                 </button>
+                <button id="admin-tab-consequences" onclick="app.switchAdminTab('consequences')" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-folder-tree mr-1.5 text-rose-400"></i> Consequence History
+                </button>
                 <button id="admin-tab-flights" onclick="app.switchAdminTab('flights')" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">
                     <i class="fa-solid fa-plane-circle-plus mr-1.5"></i> Create & Manage Flights
                 </button>
@@ -957,6 +960,20 @@
                     </form>
                 </div>
             </div>
+
+            <!-- ADMIN TAB: STAFF CONSEQUENCE HISTORY (ACCORDION DIRECTORY) -->
+            <div id="admin-section-consequences" class="hidden space-y-4">
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-folder-tree text-rose-400 mr-2"></i> Staff Consequence History Directory</span>
+                        <span class="text-xs text-slate-400 font-normal">Click any staff member below to expand their full logged consequences</span>
+                    </h3>
+                    <div id="admin-staff-consequences-accordion" class="space-y-3">
+                        <!-- Rendered dynamically by JS -->
+                    </div>
+                </div>
+            </div>
+
             <div id="admin-section-flights" class="hidden space-y-6">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Create Flight Form -->

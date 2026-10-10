@@ -1775,29 +1775,31 @@ class LumaApp {
         this.renderAdminC4Register();
         this.renderAdminAttendanceRegister();
         this.populateAdminLogStaffDropdown();
+        this.renderAdminConsequenceAccordion();
         this.renderAdminFlights();
         this.renderAdminReports();
         this.renderAdminTickets();
     }
 
     switchAdminTab(tab) {
-        const sections = ['requests', 'roster', 'c4register', 'attendance', 'logconsequence', 'flights', 'reports', 'tickets'];
+        const sections = ['requests', 'roster', 'c4register', 'attendance', 'logconsequence', 'consequences', 'flights', 'reports', 'tickets'];
         sections.forEach(s => {
             const sec = document.getElementById(`admin-section-${s}`);
             if (sec) sec.classList.add('hidden');
             const btn = document.getElementById(`admin-tab-${s}`);
-            if (btn) btn.className = "px-4 py-2 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition-all";
+            if (btn) btn.className = "shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all";
         });
 
         const targetSec = document.getElementById(`admin-section-${tab}`);
         if (targetSec) targetSec.classList.remove('hidden');
 
         const targetBtn = document.getElementById(`admin-tab-${tab}`);
-        if (targetBtn) targetBtn.className = "px-4 py-2 rounded-lg text-xs font-bold transition-all bg-amber-500 text-slate-950 shadow-md";
+        if (targetBtn) targetBtn.className = "shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-amber-500 text-slate-950 shadow-md";
 
         if (tab === 'c4register') this.renderAdminC4Register();
         if (tab === 'attendance') this.renderAdminAttendanceRegister();
         if (tab === 'logconsequence') this.populateAdminLogStaffDropdown();
+        if (tab === 'consequences') this.renderAdminConsequenceAccordion();
     }
 
     /**
@@ -2076,9 +2078,15 @@ class LumaApp {
                     ` : ''}
 
                     <!-- Promote / Demote Button -->
-                    <button onclick="app.promptPromotionPassword('${u.id}', '${u.role === 'Admin' ? 'Staff' : 'Admin'}')" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-bold rounded-lg transition-all">
-                        <i class="fa-solid fa-key mr-1"></i> ${u.role === 'Admin' ? 'Demote to Staff' : 'Promote to Admin'}
-                    </button>
+                    ${u.role === 'Head Admin' ? `
+                        <span class="px-3 py-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold rounded-lg flex items-center gap-1">
+                            <i class="fa-solid fa-crown text-xs"></i> Head Admin
+                        </span>
+                    ` : `
+                        <button onclick="app.promptPromotionPassword('${u.id}', '${u.role === 'Admin' ? 'Staff' : 'Admin'}')" class="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-bold rounded-lg transition-all">
+                            <i class="fa-solid fa-key mr-1"></i> ${u.role === 'Admin' ? 'Demote to Staff' : 'Promote to Admin'}
+                        </button>
+                    `}
 
                     <!-- Force LOA -->
                     <button onclick="app.promptForceLOA('${u.id}')" class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-300 hover:text-white border border-sky-500/30 text-xs font-bold rounded-lg">
@@ -2092,6 +2100,99 @@ class LumaApp {
                 </div>
             </div>
         `).join('');
+    }
+
+    /**
+     * Render Staff Consequence History Accordion (Admin Panel)
+     * Lists all staff members with expandable dropdown lists of their logged consequences
+     */
+    renderAdminConsequenceAccordion() {
+        const container = document.getElementById('admin-staff-consequences-accordion');
+        if (!container) return;
+
+        const staffUsers = db.data.users.filter(u => u.status === 'Approved' || u.status === 'Suspended');
+        const allConsequences = db.data.consequences || [];
+
+        if (staffUsers.length === 0) {
+            container.innerHTML = `<p class="text-slate-500 text-xs text-center py-8">No staff members found on file.</p>`;
+            return;
+        }
+
+        container.innerHTML = staffUsers.map(u => {
+            const userCsqs = allConsequences.filter(c => 
+                c.userId === u.id || 
+                (c.userName && c.userName.toLowerCase().trim() === u.preferredName.toLowerCase().trim())
+            );
+
+            return `
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden transition-all shadow-md">
+                    <!-- Staff Member Header Button (Toggle Dropdown) -->
+                    <button onclick="app.toggleStaffConsequenceAccordion('${u.id}')" class="w-full p-4 flex items-center justify-between hover:bg-slate-800/60 transition-all text-left">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <span class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-xs">
+                                <i class="fa-solid fa-user"></i>
+                            </span>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h4 class="text-sm font-bold text-white">${u.preferredName} (${u.robloxUser})</h4>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                        u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
+                                    }">${u.role}</span>
+                                    ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded">SUSPENDED</span>' : ''}
+                                </div>
+                                <p class="text-[11px] text-slate-400">Email: ${u.email} | Discord: ${u.discordUser}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                                userCsqs.length > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            }">
+                                ${userCsqs.length} ${userCsqs.length === 1 ? 'Consequence' : 'Consequences'}
+                            </span>
+                            <i id="accordion-icon-${u.id}" class="fa-solid fa-chevron-down text-slate-400 transition-transform duration-200"></i>
+                        </div>
+                    </button>
+
+                    <!-- Dropdown Consequences List -->
+                    <div id="consequence-accordion-${u.id}" class="hidden p-4 bg-slate-950/80 border-t border-slate-800/80 space-y-3">
+                        ${userCsqs.length === 0 ? `
+                            <p class="text-xs text-slate-500 italic py-2">Clean Record — No consequences or disciplinary actions logged on file.</p>
+                        ` : userCsqs.map(c => `
+                            <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-2.5 py-0.5 bg-rose-600 text-white font-extrabold text-xs rounded-lg">${c.level}</span>
+                                        <h5 class="text-xs font-bold text-white">${c.reason}</h5>
+                                        ${c.c4Status ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${c.c4Status === 'Passed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">Status: ${c.c4Status}</span>` : ''}
+                                    </div>
+                                    <p class="text-[11px] text-slate-400">Issued by: <strong class="text-slate-300">${c.issuedBy}</strong> on ${c.issuedDate || 'N/A'}</p>
+                                    ${c.c4Date ? `<p class="text-[11px] text-slate-400">Scheduled Detention: ${c.c4Date} @ ${c.c4Time} (${c.c4Location})</p>` : ''}
+                                </div>
+                                <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1">
+                                    <i class="fa-solid fa-trash-can"></i> Delete Log
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    toggleStaffConsequenceAccordion(userId) {
+        const dropdown = document.getElementById(`consequence-accordion-${userId}`);
+        const icon = document.getElementById(`accordion-icon-${userId}`);
+        if (!dropdown) return;
+
+        const isHidden = dropdown.classList.contains('hidden');
+        if (isHidden) {
+            dropdown.classList.remove('hidden');
+            if (icon) icon.classList.add('rotate-180');
+        } else {
+            dropdown.classList.add('hidden');
+            if (icon) icon.classList.remove('rotate-180');
+        }
     }
 
     liftStaffSuspension(userId) {
