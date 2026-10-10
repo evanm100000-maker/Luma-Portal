@@ -1212,6 +1212,11 @@ class LumaApp {
                         <span class="font-bold text-rose-400">${c.level}</span> - <span class="text-slate-200">${c.reason}</span>
                         <p class="text-[10px] text-slate-500 mt-0.5">Issued by ${c.issuedBy} on ${c.issuedDate}</p>
                     </div>
+                    ${['Head Admin', 'Admin'].includes(user.role) ? `
+                        <button onclick="app.deleteConsequence('${c.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Log">
+                            <i class="fa-solid fa-trash-can"></i> Delete
+                        </button>
+                    ` : ''}
                 </div>
             `).join('');
         }
