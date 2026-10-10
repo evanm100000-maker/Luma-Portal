@@ -92,22 +92,18 @@ class LumaApp {
     renderNavUserBadges(user) {
         const badgesContainer = document.getElementById('nav-user-badges');
         const adminBtn = document.getElementById('nav-admin-btn');
-        const emergencyBtn = document.getElementById('nav-emergency-btn');
 
         let html = `<span class="text-xs font-bold text-slate-300 mr-2">${user.preferredName} (${user.robloxUser})</span>`;
 
         if (user.role === 'Head Admin') {
             html += `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold badge-head-admin">HEAD ADMIN</span>`;
-            adminBtn.classList.remove('hidden');
-            if (emergencyBtn) emergencyBtn.classList.remove('hidden');
+            if (adminBtn) adminBtn.classList.remove('hidden');
         } else if (user.role === 'Admin') {
             html += `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold badge-admin">ADMIN</span>`;
-            adminBtn.classList.remove('hidden');
-            if (emergencyBtn) emergencyBtn.classList.remove('hidden');
+            if (adminBtn) adminBtn.classList.remove('hidden');
         } else {
             html += `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">STAFF</span>`;
-            adminBtn.classList.add('hidden');
-            if (emergencyBtn) emergencyBtn.classList.add('hidden');
+            if (adminBtn) adminBtn.classList.add('hidden');
         }
 
         if (user.activityStatus === 'LOA') {
@@ -1726,6 +1722,28 @@ class LumaApp {
                 </button>
             </div>
         `).join('');
+    }
+
+    // --- ABOUT & COPYRIGHT MODALS ---
+
+    openAboutModal() {
+        const modal = document.getElementById('modal-about');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    closeAboutModal() {
+        const modal = document.getElementById('modal-about');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    openCopyrightModal() {
+        const modal = document.getElementById('modal-copyright');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    closeCopyrightModal() {
+        const modal = document.getElementById('modal-copyright');
+        if (modal) modal.classList.add('hidden');
     }
 
     // --- FIREBASE CONFIG MODAL ---

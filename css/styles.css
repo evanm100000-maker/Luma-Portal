@@ -124,3 +124,12 @@ body {
     color: #f87171;
     border: 1px solid rgba(239, 68, 68, 0.4);
 }
+
+/* Utility to hide scrollbar for clean horizontal mobile tabs */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
