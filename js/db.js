@@ -81,8 +81,6 @@ class LumaDB {
 
         // 2. Initialize Firebase Cloud Sync
         this.initFirebase();
-
-        this.save();
     }
 
     /**
@@ -93,31 +91,6 @@ class LumaDB {
         if (Array.isArray(val)) return val.filter(Boolean);
         if (typeof val === 'object') return Object.values(val).filter(Boolean);
         return [];
-    }
-
-    /**
-     * Merge items by ID while respecting deleted IDs across local & cloud state
-     */
-    mergePreservingDeletions(localArr = [], cloudArr = [], deletedIds = []) {
-        const deletedSet = new Set(deletedIds || []);
-        const normCloud = this.normalizeArray(cloudArr);
-        const normLocal = this.normalizeArray(localArr);
-        const map = new Map();
-
-        normCloud.forEach(item => {
-            if (item && item.id && !deletedSet.has(item.id)) {
-                map.set(item.id, item);
-            }
-        });
-
-        normLocal.forEach(item => {
-            if (item && item.id && !deletedSet.has(item.id)) {
-                const existing = map.get(item.id);
-                map.set(item.id, existing ? { ...existing, ...item } : item);
-            }
-        });
-
-        return Array.from(map.values());
     }
 
     /**
@@ -143,44 +116,43 @@ class LumaDB {
 
                 this.fbDB = firebase.database();
 
-                // Realtime State Sync Listener (Robust Cloud Sync)
+                // Realtime Master Cloud State Sync Listener
                 this.fbDB.ref('portal_state').on('value', (snapshot) => {
                     const cloudData = snapshot.val();
                     
-                    // If cloud state is empty on fresh DB, seed cloud with local data
-                    if (!cloudData) {
+                    // If cloud state is completely empty on a brand-new DB, seed cloud with local data
+                    if (!cloudData || !cloudData.users || cloudData.users.length === 0) {
                         this.save();
                         return;
                     }
 
                     if (cloudData && typeof cloudData === 'object') {
-                        const cloudDeleted = this.normalizeArray(cloudData.deletedIds);
-                        const localDeleted = this.normalizeArray(this.data.deletedIds);
-                        const allDeletedIds = Array.from(new Set([...localDeleted, ...cloudDeleted]));
-                        this.data.deletedIds = allDeletedIds;
+                        // Master Cloud Sync: Cloud state is the single source of truth across all devices
+                        this.data.users = this.normalizeArray(cloudData.users);
+                        this.data.flights = this.normalizeArray(cloudData.flights);
+                        this.data.allocations = this.normalizeArray(cloudData.allocations);
+                        this.data.loaRequests = this.normalizeArray(cloudData.loaRequests);
+                        this.data.consequences = this.normalizeArray(cloudData.consequences);
+                        this.data.reports = this.normalizeArray(cloudData.reports);
+                        this.data.supportTickets = this.normalizeArray(cloudData.supportTickets);
 
-                        this.data.users = this.mergePreservingDeletions(this.data.users, cloudData.users, allDeletedIds);
-                        this.data.flights = this.mergePreservingDeletions(this.data.flights, cloudData.flights, allDeletedIds);
-                        this.data.allocations = this.mergePreservingDeletions(this.data.allocations, cloudData.allocations, allDeletedIds);
-                        this.data.loaRequests = this.mergePreservingDeletions(this.data.loaRequests, cloudData.loaRequests, allDeletedIds);
-                        this.data.consequences = this.mergePreservingDeletions(this.data.consequences, cloudData.consequences, allDeletedIds);
-                        this.data.reports = this.mergePreservingDeletions(this.data.reports, cloudData.reports, allDeletedIds);
-                        this.data.supportTickets = this.mergePreservingDeletions(this.data.supportTickets, cloudData.supportTickets, allDeletedIds);
-
-                        if (cloudData.activeWarningBanner !== undefined) this.data.activeWarningBanner = cloudData.activeWarningBanner;
-                        if (cloudData.maintenanceMode !== undefined) this.data.maintenanceMode = cloudData.maintenanceMode;
+                        this.data.activeWarningBanner = cloudData.activeWarningBanner || null;
+                        this.data.maintenanceMode = !!cloudData.maintenanceMode;
 
                         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
                         
-                        // Re-verify current session user
-                        if (this.currentUser) {
-                            const updatedUser = this.data.users.find(u => u.id === this.currentUser.id);
-                            if (updatedUser) this.currentUser = updatedUser;
+                        // Re-verify current session user from updated cloud users list
+                        const activeUserId = localStorage.getItem('luma_active_session') || sessionStorage.getItem('luma_active_session');
+                        if (activeUserId) {
+                            const updatedUser = this.data.users.find(u => u.id === activeUserId);
+                            if (updatedUser) {
+                                this.currentUser = updatedUser;
+                            }
                         }
 
                         // Trigger UI Live Update
                         if (window.app && typeof app.onRealtimeSync === 'function') {
-                            app.onRealtimeSync();
+                            app.onRealtimeSync(true);
                         }
                     }
                 });
@@ -465,13 +437,11 @@ class LumaDB {
     }
 
     rejectUser(userId) {
-        this.trackDeletedId(userId);
         this.data.users = (this.data.users || []).filter(u => u.id !== userId);
         this.save();
     }
 
     deleteUser(userId) {
-        this.trackDeletedId(userId);
         this.data.users = (this.data.users || []).filter(u => u.id !== userId);
         this.save();
     }
@@ -762,44 +732,28 @@ class LumaDB {
 
     // --- DELETION METHODS ---
 
-    trackDeletedId(id) {
-        if (!id) return;
-        this.data.deletedIds = this.data.deletedIds || [];
-        if (!this.data.deletedIds.includes(id)) {
-            this.data.deletedIds.push(id);
-        }
-    }
-
     deleteFlight(flightId) {
-        this.trackDeletedId(flightId);
-        const deletedAllocations = (this.data.allocations || []).filter(a => a.flightId === flightId);
-        deletedAllocations.forEach(a => this.trackDeletedId(a.id));
-
         this.data.flights = (this.data.flights || []).filter(f => f.id !== flightId);
         this.data.allocations = (this.data.allocations || []).filter(a => a.flightId !== flightId);
         this.save();
     }
 
     deleteReport(reportId) {
-        this.trackDeletedId(reportId);
         this.data.reports = (this.data.reports || []).filter(r => r.id !== reportId);
         this.save();
     }
 
     deleteSupportTicket(ticketId) {
-        this.trackDeletedId(ticketId);
         this.data.supportTickets = (this.data.supportTickets || []).filter(t => t.id !== ticketId);
         this.save();
     }
 
     deleteConsequence(consequenceId) {
-        this.trackDeletedId(consequenceId);
         this.data.consequences = (this.data.consequences || []).filter(c => c.id !== consequenceId);
         this.save();
     }
 
     deleteLOARequest(loaId) {
-        this.trackDeletedId(loaId);
         const req = (this.data.loaRequests || []).find(r => r.id === loaId);
         if (req) {
             const user = (this.data.users || []).find(u => u.id === req.userId);

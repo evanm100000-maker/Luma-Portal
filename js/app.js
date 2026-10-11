@@ -29,37 +29,24 @@ class LumaApp {
      * Protects user credentials and immediately redirects suspicious activity (DevTools, Inspect, Shortcuts) to Google.com
      */
     initSecurityShield() {
-        const triggerSecurityRedirect = (reason) => {
-            try {
-                if (window.console) console.clear();
-                if (window.db) window.db.logout();
-                sessionStorage.clear();
-                localStorage.removeItem('luma_active_session');
-            } catch (e) {}
-            window.location.href = 'https://google.com';
-        };
-
-        // 1. Intercept & Block Inspect Element Keyboard Shortcuts
+        // Intercept & Block Inspect Element Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
             // F12 key
             if (e.keyCode === 123) {
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSecurityRedirect('F12 key pressed');
                 return false;
             }
             // Ctrl+Shift+I / J / C (or Cmd+Option+I / J / C)
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSecurityRedirect('DevTools Inspector shortcut');
                 return false;
             }
             // Ctrl+U / Cmd+U (View Page Source)
             if ((e.ctrlKey || e.metaKey) && e.keyCode === 85) {
                 e.preventDefault();
                 e.stopPropagation();
-                triggerSecurityRedirect('View Source shortcut');
                 return false;
             }
             // Ctrl+S / Cmd+S (Save Page)
@@ -70,43 +57,11 @@ class LumaApp {
             }
         }, true);
 
-        // 2. Disable Right-Click Context Menu (Anti-Inspect)
+        // Disable Right-Click Context Menu (Anti-Inspect)
         document.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             return false;
         }, true);
-
-        // 3. DevTools Outer vs Inner Window Dimension Change Monitor
-        const checkDevToolsDimensions = () => {
-            const widthDiff = window.outerWidth - window.innerWidth;
-            const heightDiff = window.outerHeight - window.innerHeight;
-            if (widthDiff > 160 || heightDiff > 160) {
-                triggerSecurityRedirect('DevTools docked panel detected');
-            }
-        };
-
-        window.addEventListener('resize', checkDevToolsDimensions);
-        setInterval(checkDevToolsDimensions, 1000);
-
-        // 4. Debugger Breakpoint Loop Monitor
-        setInterval(() => {
-            const startTime = performance.now();
-            (function() { return false; })["constructor"]("debugger")();
-            const endTime = performance.now();
-            if (endTime - startTime > 100) {
-                triggerSecurityRedirect('Debugger breakpoint attached');
-            }
-        }, 1500);
-
-        // 5. Suppress Console Log Extraction
-        if (window.console) {
-            const noop = () => {};
-            console.log = noop;
-            console.info = noop;
-            console.warn = noop;
-            console.dir = noop;
-            console.table = noop;
-        }
     }
 
     /**
@@ -1955,10 +1910,17 @@ class LumaApp {
         const targetBtn = document.getElementById(`admin-tab-${tab}`);
         if (targetBtn) targetBtn.className = "shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-amber-500 text-slate-950 shadow-md";
 
-        if (tab === 'c4register') this.renderAdminC4Register();
-        if (tab === 'attendance') this.renderAdminAttendanceRegister();
-        if (tab === 'logconsequence') this.populateAdminLogStaffDropdown();
-        if (tab === 'consequences') this.renderAdminConsequenceAccordion();
+        switch (tab) {
+            case 'requests': this.renderAdminRequests(); break;
+            case 'roster': this.renderAdminRoster(); break;
+            case 'c4register': this.renderAdminC4Register(); break;
+            case 'attendance': this.renderAdminAttendanceRegister(); break;
+            case 'logconsequence': this.populateAdminLogStaffDropdown(); break;
+            case 'consequences': this.renderAdminConsequenceAccordion(); break;
+            case 'flights': this.renderAdminFlights(); break;
+            case 'reports': this.renderAdminReports(); break;
+            case 'tickets': this.renderAdminTickets(); break;
+        }
     }
 
     /**
