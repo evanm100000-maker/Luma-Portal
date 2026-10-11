@@ -268,6 +268,14 @@ class LumaApp {
         if (db.currentUser.status === 'Suspended') {
             this.showSuspensionScreen(db.currentUser);
             return;
+        } else {
+            // If suspension was lifted, close suspension screen and restore view
+            const suspensionScreen = document.getElementById('suspension-screen');
+            if (suspensionScreen && !suspensionScreen.classList.contains('hidden')) {
+                suspensionScreen.classList.add('hidden');
+                if (this.suspensionTimerInterval) clearInterval(this.suspensionTimerInterval);
+                this.navigateTo('dashboard');
+            }
         }
 
         this.renderNavUserBadges(db.currentUser);
@@ -1560,19 +1568,36 @@ class LumaApp {
         if (userConsequences.length === 0) {
             historyList.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">Clean record! No consequences on file.</p>`;
         } else {
-            historyList.innerHTML = userConsequences.map(c => `
-                <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs">
+            historyList.innerHTML = userConsequences.map(c => {
+                const isSuspension = c.level === 'C5' || c.isSuspension || (c.level === 'C4B' && c.c4Status === 'Failed') || !!c.c5DurationHours;
+                const isExpired = user.suspensionUntil && new Date(user.suspensionUntil).getTime() <= Date.now();
+                const isActiveSuspension = isSuspension && !c.lifted && user.status === 'Suspended' && !isExpired;
+
+                return `
+                <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs gap-3">
                     <div>
-                        <span class="font-bold text-rose-400">${c.level}</span> - <span class="text-slate-200">${c.reason}</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-bold text-rose-400">${c.level}</span> - <span class="text-slate-200">${c.reason}</span>
+                            ${isActiveSuspension ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white animate-pulse">Active Suspension</span>` : ''}
+                            ${c.lifted ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"><i class="fa-solid fa-check text-[9px]"></i> Suspension Lifted</span>` : ''}
+                        </div>
                         <p class="text-[10px] text-slate-500 mt-0.5">Issued by ${c.issuedBy} on ${c.issuedDate}</p>
                     </div>
                     ${['Head Admin', 'Admin'].includes(user.role) ? `
-                        <button onclick="app.deleteConsequence('${c.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Log">
-                            <i class="fa-solid fa-trash-can"></i> Delete
-                        </button>
+                        <div class="flex items-center gap-2 flex-wrap shrink-0">
+                            ${isActiveSuspension ? `
+                                <button onclick="app.liftConsequenceSuspension('${c.id}', '${user.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Lift Suspension (Keeps record on file)">
+                                    <i class="fa-solid fa-unlock"></i> Lift
+                                </button>
+                            ` : ''}
+                            <button onclick="app.deleteConsequence('${c.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Log">
+                                <i class="fa-solid fa-trash-can"></i> Delete
+                            </button>
+                        </div>
                     ` : ''}
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
     }
 
@@ -2012,35 +2037,53 @@ class LumaApp {
             return;
         }
 
-        container.innerHTML = c4List.map(c => `
+        container.innerHTML = c4List.map(c => {
+            const targetUser = (db.data.users || []).find(u => u.id === c.userId || (c.userName && u.preferredName && c.userName.toLowerCase().includes(u.preferredName.toLowerCase())));
+            const isSuspension = c.c4Status === 'Failed' || c.isSuspension;
+            const isExpired = targetUser && targetUser.suspensionUntil && new Date(targetUser.suspensionUntil).getTime() <= Date.now();
+            const isActiveSuspension = isSuspension && !c.lifted && targetUser && targetUser.status === 'Suspended' && !isExpired;
+
+            return `
             <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
                 <div class="space-y-1">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="px-3 py-1 bg-rose-600 text-white font-extrabold text-xs rounded-lg">${c.level}</span>
                         <h4 class="text-base font-bold text-white">${c.userName}</h4>
                         <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
                             c.c4Status === 'Passed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
                             c.c4Status === 'Failed' ? 'bg-red-600 text-white font-black' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                         }">${c.c4Status || 'Pending'}</span>
+                        ${isActiveSuspension ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white animate-pulse">Active Suspension</span>` : ''}
+                        ${c.lifted ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Suspension Lifted</span>` : ''}
                     </div>
                     <p class="text-xs text-slate-300"><strong>Scheduled Date & Time:</strong> ${c.c4Date || 'TBD'} @ ${c.c4Time || 'TBD'}</p>
                     <p class="text-xs text-slate-400"><strong>Location:</strong> ${c.c4Location || 'Training Facility'}</p>
                     <p class="text-xs text-slate-400"><strong>Reason:</strong> ${c.reason} <span class="text-slate-500">(Issued by ${c.issuedBy})</span></p>
                 </div>
 
-                <div class="flex items-center gap-2 w-full md:w-auto">
+                <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                    ${c.c4Status !== 'Passed' ? `
                     <button onclick="app.evaluateC4('${c.id}', 'Passed')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
                         <i class="fa-solid fa-check-circle"></i> Mark as Pass
                     </button>
+                    ` : ''}
+                    ${c.c4Status !== 'Failed' ? `
                     <button onclick="app.evaluateC4('${c.id}', 'Failed')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
                         <i class="fa-solid fa-times-circle"></i> Mark as Fail
                     </button>
+                    ` : ''}
+                    ${isActiveSuspension ? `
+                    <button onclick="app.liftConsequenceSuspension('${c.id}', '${c.userId}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5" title="Lift Suspension (Keeps record on file)">
+                        <i class="fa-solid fa-unlock"></i> Lift Suspension
+                    </button>
+                    ` : ''}
                     <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5" title="Delete Log">
                         <i class="fa-solid fa-trash-can"></i> Delete
                     </button>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     evaluateC4(cId, result) {
@@ -2348,22 +2391,45 @@ class LumaApp {
                     <div id="consequence-accordion-${u.id}" class="${isExpanded ? '' : 'hidden'} p-4 bg-slate-950/80 border-t border-slate-800/80 space-y-3">
                         ${userCsqs.length === 0 ? `
                             <p class="text-xs text-slate-500 italic py-2">Clean Record — No consequences or disciplinary actions logged on file.</p>
-                        ` : userCsqs.map(c => `
+                        ` : userCsqs.map(c => {
+                            const isSuspension = c.level === 'C5' || c.isSuspension || (c.level === 'C4B' && c.c4Status === 'Failed') || !!c.c5DurationHours;
+                            const isExpired = u.suspensionUntil && new Date(u.suspensionUntil).getTime() <= Date.now();
+                            const isActiveSuspension = isSuspension && !c.lifted && u.status === 'Suspended' && !isExpired;
+
+                            return `
                             <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <div class="space-y-1">
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="px-2.5 py-0.5 bg-rose-600 text-white font-extrabold text-xs rounded-lg">${c.level}</span>
                                         <h5 class="text-xs font-bold text-white">${c.reason}</h5>
+                                        ${isActiveSuspension ? `
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white animate-pulse flex items-center gap-1 shadow-sm">
+                                                <i class="fa-solid fa-lock text-[9px]"></i> Active Suspension
+                                            </span>
+                                        ` : ''}
+                                        ${c.lifted ? `
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                                <i class="fa-solid fa-check text-[9px]"></i> Suspension Lifted (On File)
+                                            </span>
+                                        ` : ''}
                                         ${c.c4Status ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${c.c4Status === 'Passed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">Status: ${c.c4Status}</span>` : ''}
                                     </div>
                                     <p class="text-[11px] text-slate-400">Issued by: <strong class="text-slate-300">${c.issuedBy}</strong> on ${c.issuedDate || 'N/A'}</p>
                                     ${c.c4Date ? `<p class="text-[11px] text-slate-400">Scheduled Detention: ${c.c4Date} @ ${c.c4Time} (${c.c4Location})</p>` : ''}
                                 </div>
-                                <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1">
-                                    <i class="fa-solid fa-trash-can"></i> Delete Log
-                                </button>
+                                <div class="flex items-center gap-2 flex-wrap shrink-0">
+                                    ${isActiveSuspension ? `
+                                        <button onclick="app.liftConsequenceSuspension('${c.id}', '${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/40 text-xs font-bold rounded-lg transition-all shadow flex items-center gap-1.5" title="Lift Suspension (Keeps record on file)">
+                                            <i class="fa-solid fa-unlock"></i> Lift Suspension
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete Log">
+                                        <i class="fa-solid fa-trash-can"></i> Delete Log
+                                    </button>
+                                </div>
                             </div>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                 </div>
             `;
@@ -2392,6 +2458,39 @@ class LumaApp {
         db.removeSuspension(userId);
         Swal.fire('Suspension Lifted!', 'User account status restored to Approved.', 'success');
         this.renderAdminPanel();
+        this.onRealtimeSync(true);
+    }
+
+    liftConsequenceSuspension(consequenceId, userId) {
+        const csq = (db.data.consequences || []).find(c => c.id === consequenceId);
+        const user = (db.data.users || []).find(u => u.id === userId || (csq && csq.userId === u.id));
+        const userName = user ? user.preferredName : (csq ? csq.userName : 'this staff member');
+
+        Swal.fire({
+            title: 'Lift Suspension?',
+            html: `Are you sure you want to lift the suspension for <strong>${userName}</strong>?<br><br><span class="text-xs text-slate-400">This will restore portal access immediately while <strong>keeping the consequence record permanently on file</strong>.</span>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: '<i class="fa-solid fa-unlock mr-1"></i> Yes, Lift Suspension',
+            cancelButtonText: 'Cancel'
+        }).then(result => {
+            if (result.isConfirmed) {
+                db.liftConsequenceSuspension(consequenceId, userId);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Suspension Lifted!',
+                    text: `Suspension lifted for ${userName}. Portal access restored and record kept on file.`,
+                    confirmButtonColor: '#10b981'
+                });
+                this.renderAdminPanel();
+                if (document.getElementById('page-consequences') && !document.getElementById('page-consequences').classList.contains('hidden')) {
+                    this.renderConsequencesPage();
+                }
+                this.onRealtimeSync(true);
+            }
+        });
     }
 
     /**
@@ -2718,17 +2817,29 @@ class LumaApp {
     }
 
     deleteConsequence(consequenceId) {
+        const csq = (db.data.consequences || []).find(c => c.id === consequenceId);
+        const isSuspension = csq && (csq.level === 'C5' || csq.isSuspension || (csq.level === 'C4B' && csq.c4Status === 'Failed') || !!csq.c5DurationHours);
+        const targetUser = csq ? (db.data.users || []).find(u => u.id === csq.userId || (csq.userName && u.preferredName && csq.userName.toLowerCase().includes(u.preferredName.toLowerCase()))) : null;
+        const willLift = isSuspension && targetUser && targetUser.status === 'Suspended';
+
         Swal.fire({
-            title: 'Delete Consequence Log?',
-            text: 'Are you sure you want to remove this consequence record?',
+            title: willLift ? 'Delete & Lift Suspension?' : 'Delete Consequence Log?',
+            html: willLift 
+                ? `Are you sure you want to delete this suspension record?<br><br><span class="text-xs text-rose-300">Deleting this suspension will automatically lift the suspension for <strong>${targetUser.preferredName}</strong> and restore their portal access.</span>` 
+                : 'Are you sure you want to remove this consequence record?',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
-            confirmButtonText: 'Yes, Delete Record'
+            confirmButtonText: willLift ? '<i class="fa-solid fa-trash-can mr-1"></i> Delete & Lift Suspension' : 'Yes, Delete Record'
         }).then(result => {
             if (result.isConfirmed) {
                 db.deleteConsequence(consequenceId);
-                Swal.fire('Deleted!', 'Consequence record removed.', 'success');
+                Swal.fire({
+                    icon: 'success',
+                    title: willLift ? 'Suspension Deleted & Lifted!' : 'Deleted!',
+                    text: willLift ? `Consequence record removed and portal access restored for ${targetUser.preferredName}.` : 'Consequence record removed.',
+                    confirmButtonColor: '#10b981'
+                });
                 this.renderAdminPanel();
                 if (document.getElementById('page-consequences') && !document.getElementById('page-consequences').classList.contains('hidden')) {
                     this.renderConsequencesPage();

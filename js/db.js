@@ -579,7 +579,9 @@ class LumaDB {
             c4Time: cData.c4Time || null,
             c4Location: cData.c4Location || null,
             c4Status: ['C4A','C4B'].includes(cData.level) ? 'Pending' : null,
-            c5DurationHours: cData.c5DurationHours || null
+            c5DurationHours: cData.c5DurationHours || null,
+            isSuspension: cData.level === 'C5',
+            lifted: false
         };
 
         // Handle C5 Suspension (Account Lockout)
@@ -618,6 +620,8 @@ class LumaDB {
             } else if (csq.level === 'C4B') {
                 // Fail C4B -> Escalate to 2-Day (48 Hour) C5 Suspension!
                 csq.c4Status = 'Failed';
+                csq.isSuspension = true;
+                csq.lifted = false;
                 if (user) {
                     user.status = 'Suspended';
                     const expiry = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
@@ -636,8 +640,33 @@ class LumaDB {
             user.status = 'Approved';
             user.suspensionUntil = null;
             user.suspensionReason = null;
-            this.save();
         }
+        (this.data.consequences || []).forEach(c => {
+            const matchesUser = c.userId === userId || (user && c.userName && c.userName.toLowerCase().includes(user.preferredName.toLowerCase()));
+            const isSuspension = c.level === 'C5' || c.isSuspension || (c.level === 'C4B' && c.c4Status === 'Failed');
+            if (matchesUser && isSuspension) {
+                c.lifted = true;
+                c.liftedAt = new Date().toISOString();
+            }
+        });
+        this.save();
+    }
+
+    liftConsequenceSuspension(consequenceId, userId = null) {
+        const csq = (this.data.consequences || []).find(c => c.id === consequenceId);
+        if (csq) {
+            csq.lifted = true;
+            csq.liftedAt = new Date().toISOString();
+        }
+        const targetUserId = userId || (csq ? csq.userId : null);
+        const user = (this.data.users || []).find(u => u.id === targetUserId || (csq && csq.userName && u.preferredName && csq.userName.toLowerCase().includes(u.preferredName.toLowerCase())));
+        if (user && user.status === 'Suspended') {
+            user.status = 'Approved';
+            user.suspensionUntil = null;
+            user.suspensionReason = null;
+        }
+        this.save();
+        return { csq, user };
     }
 
     // --- REPORTS METHODS ---
@@ -749,6 +778,18 @@ class LumaDB {
     }
 
     deleteConsequence(consequenceId) {
+        const csq = (this.data.consequences || []).find(c => c.id === consequenceId);
+        if (csq) {
+            const isSuspension = csq.level === 'C5' || csq.isSuspension || (csq.level === 'C4B' && csq.c4Status === 'Failed') || !!csq.c5DurationHours;
+            if (isSuspension) {
+                const user = (this.data.users || []).find(u => u.id === csq.userId || (csq.userName && u.preferredName && csq.userName.toLowerCase().includes(u.preferredName.toLowerCase())));
+                if (user && user.status === 'Suspended') {
+                    user.status = 'Approved';
+                    user.suspensionUntil = null;
+                    user.suspensionReason = null;
+                }
+            }
+        }
         this.data.consequences = (this.data.consequences || []).filter(c => c.id !== consequenceId);
         this.save();
     }
