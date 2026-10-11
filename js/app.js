@@ -72,6 +72,7 @@ class LumaApp {
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(() => {
             if (db.currentUser) {
+                db.touchUserActivity(db.currentUser.id);
                 db.processAutoExpiries();
                 this.onRealtimeSync();
             }
@@ -309,7 +310,7 @@ class LumaApp {
         this.lastSyncedStateHash = currentHash;
 
         // Update active screen elements dynamically
-        const activeScreenId = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin']
+        const activeScreenId = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-activeloa', 'page-staffdirectory', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin']
             .find(id => {
                 const el = document.getElementById(id);
                 return el && !el.classList.contains('hidden');
@@ -321,6 +322,8 @@ class LumaApp {
                 case 'page-calendar': this.renderCalendar(); break;
                 case 'page-allocations': this.renderAllocations(); break;
                 case 'page-loa': this.renderLOAPage(); break;
+                case 'page-activeloa': this.renderActiveLOAPage(); break;
+                case 'page-staffdirectory': this.renderStaffDirectoryPage(); break;
                 case 'page-consequences': this.renderConsequencesPage(); break;
                 case 'page-reports': this.renderReportsPage(); break;
                 case 'page-stats': this.renderStatsPage(); break;
@@ -823,6 +826,10 @@ class LumaApp {
      * Log out active user
      */
     logout() {
+        if (db.currentUser) {
+            db.currentUser.lastActiveAt = 0;
+            db.save();
+        }
         db.logout();
         if (this.suspensionTimerInterval) clearInterval(this.suspensionTimerInterval);
         this.checkAuth();
@@ -857,6 +864,8 @@ class LumaApp {
                     case 'calendar': this.renderCalendar(); break;
                     case 'allocations': this.renderAllocations(); break;
                     case 'loa': this.renderLOAPage(); break;
+                    case 'activeloa': this.renderActiveLOAPage(); break;
+                    case 'staffdirectory': this.renderStaffDirectoryPage(); break;
                     case 'consequences': this.renderConsequencesPage(); break;
                     case 'reports': this.renderReportsPage(); break;
                     case 'stats': this.renderStatsPage(); break;
@@ -870,7 +879,7 @@ class LumaApp {
     }
 
     hideAllPages() {
-        const pages = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin'];
+        const pages = ['dashboard-screen', 'page-calendar', 'page-allocations', 'page-loa', 'page-activeloa', 'page-staffdirectory', 'page-consequences', 'page-reports', 'page-stats', 'page-support', 'page-admin'];
         pages.forEach(p => {
             const el = document.getElementById(p);
             if (el) el.classList.add('hidden');
@@ -964,6 +973,15 @@ class LumaApp {
 
         // Check if consequence alert popup applies for LOA/Reduced Activity user
         this.checkLOAConsequenceNotice(user);
+
+        // Update dashboard badges for new modules
+        const activeLOACount = (db.data.users || []).filter(u => (u.status === 'Approved' || u.status === 'Suspended') && (u.activityStatus === 'LOA' || u.activityStatus === 'Reduced Activity')).length;
+        const dashLoaBadge = document.getElementById('dash-active-loa-badge');
+        if (dashLoaBadge) dashLoaBadge.textContent = `${activeLOACount} Active`;
+
+        const onlineCount = (db.data.users || []).filter(u => (u.status === 'Approved' || u.status === 'Suspended') && this.isUserOnline(u)).length;
+        const dashOnlineBadge = document.getElementById('dash-online-count-text');
+        if (dashOnlineBadge) dashOnlineBadge.textContent = `${onlineCount} Online`;
     }
 
     // --- USER PREFERENCES & SETTINGS CONTROLLER ---
@@ -1476,7 +1494,7 @@ class LumaApp {
     renderLOAPage() {
         const container = document.getElementById('loa-list-container');
         const user = db.currentUser;
-        const requests = db.data.loaRequests;
+        const requests = db.data.loaRequests || [];
 
         if (requests.length === 0) {
             container.innerHTML = `<p class="text-slate-500 text-xs text-center py-8">No LOA or Reduced Activity requests filed.</p>`;
@@ -1484,18 +1502,22 @@ class LumaApp {
         }
 
         container.innerHTML = requests.map(r => `
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold ${r.type === 'LOA' ? 'badge-loa' : 'badge-reduced'}">${r.type}</span>
                         <h4 class="text-sm font-bold text-white">${r.userName}</h4>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">Reason: ${r.reason}</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5"><i class="fa-solid fa-calendar text-amber-400 mr-1"></i> Active: ${r.startDate} to ${r.endDate}</p>
+                    <p class="text-xs text-slate-300 mt-1"><strong>Reason:</strong> ${r.reason}</p>
+                    <p class="text-[11px] text-slate-500 mt-0.5"><i class="fa-solid fa-calendar text-amber-400 mr-1"></i> Active: <strong>${r.startDate}</strong> to <strong>${r.endDate}</strong></p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold">
-                        ${r.status}
+                    <span class="px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        r.status === 'Approved' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        r.status === 'Pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                        'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }">
+                        ${r.status === 'Pending' ? '<i class="fa-solid fa-clock mr-1"></i> Pending Approval' : r.status === 'Approved' ? '<i class="fa-solid fa-check mr-1"></i> Approved' : '<i class="fa-solid fa-times mr-1"></i> Denied'}
                     </span>
                     ${['Head Admin', 'Admin'].includes(user.role) || r.userId === user.id ? `
                         <button onclick="app.deleteLOARequest('${r.id}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-lg transition-all flex items-center gap-1" title="Delete LOA">
@@ -1513,7 +1535,19 @@ class LumaApp {
         const type = document.getElementById('loa-type').value;
         const startDate = document.getElementById('loa-start-date').value;
         const endDate = document.getElementById('loa-end-date').value;
-        const reason = document.getElementById('loa-reason').value;
+        const reason = document.getElementById('loa-reason').value.trim();
+
+        if (!startDate || !endDate || !reason) {
+            Swal.fire('Incomplete Request', 'Please fill in a Start Date, End Date, and Reason for your request.', 'warning');
+            return;
+        }
+
+        if (endDate <= startDate) {
+            Swal.fire('Invalid Date Range', 'End date must be after Start date.', 'warning');
+            return;
+        }
+
+        const isAdmin = ['Head Admin', 'Admin'].includes(user.role);
 
         db.submitLOARequest({
             userId: user.id,
@@ -1521,13 +1555,369 @@ class LumaApp {
             type,
             startDate,
             endDate,
-            reason
+            reason,
+            isAdmin
         });
 
-        Swal.fire('Request Submitted!', `Your ${type} application has been activated until ${endDate}.`, 'success');
+        if (isAdmin) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Application Activated!',
+                text: `Your ${type} has been activated immediately until ${endDate}.`,
+                confirmButtonColor: '#f59e0b'
+            });
+        } else {
+            Swal.fire({
+                icon: 'success',
+                title: 'Application Sent to Admin Panel!',
+                text: `Your application to go on ${type} from ${startDate} to ${endDate} has been submitted for Admin approval. You will receive quota exemption once approved by an Administrator.`,
+                confirmButtonColor: '#f59e0b'
+            });
+        }
+
         e.target.reset();
         this.renderLOAPage();
         this.renderNavUserBadges(db.currentUser);
+        this.onRealtimeSync(true);
+    }
+
+    // Helper to evaluate if a user is active online (within 90s heartbeat or current user)
+    isUserOnline(u) {
+        if (!u) return false;
+        if (db.currentUser && u.id === db.currentUser.id) return true;
+        if (u.lastActiveAt && (Date.now() - Number(u.lastActiveAt) < 90000)) return true;
+        return false;
+    }
+
+    // ==========================================
+    // 3B. ACTIVE LOA / REDUCED ACTIVITY DIRECTORY
+    // ==========================================
+
+    renderActiveLOAPage() {
+        const container = document.getElementById('activeloa-list-container');
+        if (!container) return;
+
+        const allUsers = db.data.users || [];
+        const allRequests = db.data.loaRequests || [];
+        const searchInput = document.getElementById('activeloa-search-input');
+        const searchTerm = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+        // Staff members currently on approved LOA or Reduced Activity
+        const activeStaff = allUsers.filter(u => 
+            (u.activityStatus === 'LOA' || u.activityStatus === 'Reduced Activity') &&
+            u.status !== 'Pending'
+        );
+
+        // Update top tally summary counters
+        const totalCount = activeStaff.length;
+        const fullLOACount = activeStaff.filter(u => u.activityStatus === 'LOA').length;
+        const raCount = activeStaff.filter(u => u.activityStatus === 'Reduced Activity').length;
+
+        const totalEl = document.getElementById('tally-active-loa-total');
+        const fullEl = document.getElementById('tally-active-loa-full');
+        const raEl = document.getElementById('tally-active-loa-ra');
+        if (totalEl) totalEl.textContent = totalCount;
+        if (fullEl) fullEl.textContent = fullLOACount;
+        if (raEl) raEl.textContent = raCount;
+
+        // Sync with dashboard module badge
+        const dashBadge = document.getElementById('dash-active-loa-badge');
+        if (dashBadge) dashBadge.textContent = `${totalCount} Active`;
+
+        // Search query filter
+        const filtered = activeStaff.filter(u => {
+            if (!searchTerm) return true;
+            return (u.preferredName && u.preferredName.toLowerCase().includes(searchTerm)) ||
+                   (u.robloxUser && u.robloxUser.toLowerCase().includes(searchTerm)) ||
+                   (u.discordUser && u.discordUser.toLowerCase().includes(searchTerm));
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-12 space-y-3">
+                    <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500 text-lg">
+                        <i class="fa-solid fa-user-check"></i>
+                    </div>
+                    <p class="text-slate-400 text-sm font-semibold">No Staff Currently on Active LOA or Reduced Activity</p>
+                    <p class="text-slate-500 text-xs max-w-md mx-auto">All staff members are currently operating under standard flight attendance quota requirements.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isAdmin = db.currentUser && ['Head Admin', 'Admin'].includes(db.currentUser.role);
+
+        container.innerHTML = filtered.map(u => {
+            const req = [...allRequests].reverse().find(r => r.userId === u.id && r.status === 'Approved') || {};
+            const startDate = req.startDate || 'Active';
+            const endDate = u.loaUntil || req.endDate || 'Ongoing';
+            const reason = req.reason || 'Leave of Absence approved on portal file.';
+            const isFullLOA = u.activityStatus === 'LOA';
+
+            let daysLeft = 'Active';
+            if (u.loaUntil) {
+                const diffMs = new Date(u.loaUntil).getTime() - new Date(todayStr).getTime();
+                const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                daysLeft = diffDays > 0 ? `${diffDays} Day${diffDays === 1 ? '' : 's'} Remaining` : 'Expiring Today';
+            }
+
+            return `
+                <div class="bg-slate-900/90 border border-slate-800 hover:border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md transition-all">
+                    <div class="space-y-1.5 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold ${isFullLOA ? 'badge-loa' : 'badge-reduced'} flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-solid ${isFullLOA ? 'fa-plane-slash' : 'fa-hourglass-half'} text-[9px]"></i>
+                                ${u.activityStatus}
+                            </span>
+                            <h4 class="text-base font-bold text-white">${u.preferredName}</h4>
+                            <span class="text-xs text-slate-400">(@${u.robloxUser})</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                                u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
+                            }">${u.role}</span>
+                        </div>
+                        <p class="text-xs text-slate-300"><strong>Reason:</strong> <span class="italic text-slate-200">${reason}</span></p>
+                        <div class="flex items-center gap-4 text-[11px] text-slate-400 flex-wrap">
+                            <span><i class="fa-solid fa-calendar-days text-amber-400 mr-1"></i> Period: <strong>${startDate}</strong> &rarr; <strong>${endDate}</strong></span>
+                            <span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold text-[10px]">
+                                <i class="fa-solid fa-clock mr-1"></i> ${daysLeft}
+                            </span>
+                            <span><i class="fa-brands fa-discord text-indigo-400 mr-1"></i> ${u.discordUser}</span>
+                        </div>
+                    </div>
+
+                    ${(isAdmin || (db.currentUser && db.currentUser.id === u.id)) ? `
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="app.endStaffLOA('${u.id}', '${(u.preferredName || '').replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border border-slate-700 hover:border-emerald-500 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow" title="End LOA & restore regular activity status">
+                                <i class="fa-solid fa-rotate-left"></i> End Exception
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    endStaffLOA(userId, userName) {
+        Swal.fire({
+            title: `End LOA for ${userName}?`,
+            text: `Restore regular status and quota requirements for ${userName}?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Yes, End LOA'
+        }).then(result => {
+            if (result.isConfirmed) {
+                const user = (db.data.users || []).find(u => u.id === userId);
+                if (user) {
+                    user.activityStatus = 'Normal';
+                    user.loaUntil = null;
+                    db.save();
+                    Swal.fire('Restored!', `${userName}'s activity status restored to Normal.`, 'success');
+                    this.renderActiveLOAPage();
+                    this.renderAdminPanel();
+                    this.renderNavUserBadges(db.currentUser);
+                    this.onRealtimeSync(true);
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // 3C. STAFF DIRECTORY & REAL-TIME ACTIVITY
+    // ==========================================
+
+    setStaffDirectoryFilter(filter) {
+        this.staffDirectoryFilter = filter;
+        const btnAll = document.getElementById('staff-filter-all');
+        const btnOnline = document.getElementById('staff-filter-online');
+        const btnAdmin = document.getElementById('staff-filter-admin');
+        const btnStaff = document.getElementById('staff-filter-staff');
+
+        const activeClasses = ['bg-emerald-600', 'text-white', 'shadow'];
+        const inactiveClasses = ['bg-slate-900', 'text-slate-400', 'hover:text-white', 'border', 'border-slate-800'];
+
+        [btnAll, btnOnline, btnAdmin, btnStaff].forEach(btn => {
+            if (!btn) return;
+            btn.classList.remove('bg-emerald-600', 'text-white', 'shadow', 'bg-slate-900', 'text-slate-400', 'hover:text-white', 'border', 'border-slate-800');
+        });
+
+        const targetBtn = filter === 'online' ? btnOnline : filter === 'admin' ? btnAdmin : filter === 'staff' ? btnStaff : btnAll;
+        if (targetBtn) {
+            targetBtn.classList.add(...activeClasses);
+        }
+        [btnAll, btnOnline, btnAdmin, btnStaff].forEach(btn => {
+            if (btn && btn !== targetBtn) {
+                btn.classList.add(...inactiveClasses);
+            }
+        });
+
+        this.renderStaffDirectoryPage();
+    }
+
+    renderStaffDirectoryPage() {
+        const grid = document.getElementById('staff-directory-grid');
+        if (!grid) return;
+
+        if (!this.staffDirectoryFilter) this.staffDirectoryFilter = 'all';
+
+        const allUsers = (db.data.users || []).filter(u => u.status === 'Approved' || u.status === 'Suspended');
+        const searchInput = document.getElementById('staff-directory-search');
+        const searchTerm = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+        // Calculate live online activity
+        let onlineCount = 0;
+        allUsers.forEach(u => {
+            if (this.isUserOnline(u)) onlineCount++;
+        });
+
+        const onlineNumEl = document.getElementById('staff-online-count-number');
+        if (onlineNumEl) onlineNumEl.textContent = onlineCount;
+
+        const dashCountEl = document.getElementById('dash-online-count-text');
+        if (dashCountEl) dashCountEl.textContent = `${onlineCount} Staff Online`;
+
+        // Filter users
+        let filtered = allUsers.filter(u => {
+            const isOnline = this.isUserOnline(u);
+            if (this.staffDirectoryFilter === 'online' && !isOnline) return false;
+            if (this.staffDirectoryFilter === 'admin' && !['Head Admin', 'Admin'].includes(u.role)) return false;
+            if (this.staffDirectoryFilter === 'staff' && u.role !== 'Staff') return false;
+
+            if (searchTerm) {
+                const nameMatch = (u.preferredName && u.preferredName.toLowerCase().includes(searchTerm)) ||
+                                  (u.robloxUser && u.robloxUser.toLowerCase().includes(searchTerm)) ||
+                                  (u.discordUser && u.discordUser.toLowerCase().includes(searchTerm));
+                if (!nameMatch) return false;
+            }
+            return true;
+        });
+
+        // Sort: Online users first, then by role hierarchy
+        const roleOrder = { 'Head Admin': 1, 'Admin': 2, 'Staff': 3 };
+        filtered.sort((a, b) => {
+            const aOnline = this.isUserOnline(a) ? 0 : 1;
+            const bOnline = this.isUserOnline(b) ? 0 : 1;
+            if (aOnline !== bOnline) return aOnline - bOnline;
+            const aRole = roleOrder[a.role] || 4;
+            const bRole = roleOrder[b.role] || 4;
+            if (aRole !== bRole) return aRole - bRole;
+            return (a.preferredName || '').localeCompare(b.preferredName || '');
+        });
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12 space-y-3">
+                    <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500 text-lg">
+                        <i class="fa-solid fa-users-slash"></i>
+                    </div>
+                    <p class="text-slate-400 text-sm font-semibold">No Staff Found Matching Filter</p>
+                    <p class="text-slate-500 text-xs">Try clearing your search term or choosing "All Staff".</p>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = filtered.map(u => {
+            const isOnline = this.isUserOnline(u);
+            const isSuspended = u.status === 'Suspended';
+            const isOnLOA = u.activityStatus === 'LOA';
+            const isOnRA = u.activityStatus === 'Reduced Activity';
+            const isSelf = db.currentUser && u.id === db.currentUser.id;
+
+            return `
+                <div class="bg-slate-900/90 border ${isOnline ? 'border-emerald-500/40 shadow-emerald-950/20 shadow-lg' : 'border-slate-800'} hover:border-slate-700 p-5 rounded-2xl flex flex-col justify-between gap-4 transition-all group">
+                    <div class="space-y-3">
+                        <!-- Top Header: Avatar + Name + Online Activity -->
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-950 border border-slate-700 flex items-center justify-center text-white font-black text-sm shadow">
+                                        ${(u.preferredName || 'S').charAt(0).toUpperCase()}
+                                    </div>
+                                    <!-- Online Green Badge Indicator -->
+                                    <span class="absolute -bottom-1 -right-1 flex h-4 w-4">
+                                        ${isOnline ? `
+                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-slate-900"></span>
+                                        ` : `
+                                            <span class="relative inline-flex rounded-full h-4 w-4 bg-slate-600 border-2 border-slate-900"></span>
+                                        `}
+                                    </span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <h4 class="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">${u.preferredName}</h4>
+                                        ${isSelf ? '<span class="text-[9px] font-black px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded">YOU</span>' : ''}
+                                    </div>
+                                    <p class="text-xs text-slate-400">@${u.robloxUser}</p>
+                                </div>
+                            </div>
+
+                            <!-- Live Activity Status Pill -->
+                            <div class="text-right">
+                                ${isOnline ? `
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm animate-pulse">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                        Active (Online)
+                                    </span>
+                                ` : `
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                        Offline
+                                    </span>
+                                `}
+                            </div>
+                        </div>
+
+                        <!-- Roles & Special Status Badges -->
+                        <div class="flex items-center gap-1.5 flex-wrap pt-1">
+                            <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
+                            }">${u.role}</span>
+
+                            ${isOnLOA ? `
+                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-loa flex items-center gap-1 shadow-sm">
+                                    <i class="fa-solid fa-plane-slash text-[9px]"></i> LOA (Exempt)
+                                </span>
+                            ` : isOnRA ? `
+                                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-reduced flex items-center gap-1 shadow-sm">
+                                    <i class="fa-solid fa-hourglass-half text-[9px]"></i> Reduced Activity
+                                </span>
+                            ` : ''}
+
+                            ${isSuspended ? `
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white flex items-center gap-1 shadow-sm">
+                                    <i class="fa-solid fa-lock text-[9px]"></i> Suspended
+                                </span>
+                            ` : ''}
+                        </div>
+
+                        <!-- Info Details -->
+                        <div class="bg-slate-950/60 rounded-xl p-2.5 border border-slate-800/80 space-y-1 text-[11px]">
+                            <div class="flex items-center justify-between text-slate-400">
+                                <span><i class="fa-brands fa-discord text-indigo-400 mr-1.5"></i>Discord:</span>
+                                <span class="text-slate-200 font-medium">${u.discordUser || 'N/A'}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-slate-400">
+                                <span><i class="fa-solid fa-plane-arrival text-sky-400 mr-1.5"></i>Flights Attended:</span>
+                                <span class="text-sky-300 font-bold">${u.flightsAttended || 0}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-slate-400">
+                                <span><i class="fa-solid fa-award text-amber-400 mr-1.5"></i>Praise Points:</span>
+                                <span class="text-amber-300 font-bold">${u.praisePoints || 0}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Details -->
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Joined: ${u.joinedDate ? new Date(u.joinedDate).toLocaleDateString() : 'Active Member'}</span>
+                        ${isOnLOA || isOnRA ? `<span class="text-amber-400 font-semibold"><i class="fa-solid fa-calendar mr-1"></i>Until: ${u.loaUntil || 'Ongoing'}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     // ==========================================
@@ -1546,7 +1936,7 @@ class LumaApp {
 
         // Upcoming C4 Sanctions (Detentions)
         const c4List = document.getElementById('c4-sanctions-list');
-        const upcomingC4 = userConsequences.filter(c => ['C4A','C4B'].includes(c.level));
+        const upcomingC4 = userConsequences.filter(c => ['C4A','C4B'].includes(c.level) && c.c4Status !== 'Passed' && c.c4Status !== 'Failed');
 
         if (upcomingC4.length === 0) {
             c4List.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">No upcoming C4 detentions assigned.</p>`;
@@ -1965,6 +2355,7 @@ class LumaApp {
         container.innerHTML = attendingAllocations.map(a => {
             const flight = db.data.flights.find(f => f.id === a.flightId) || { code: 'FLIGHT', airport: 'Airport', date: 'TBD', time: 'TBD' };
             const verified = a.attendanceVerified;
+            const staffUser = (db.data.users || []).find(u => u.id === a.userId || (a.userName && u.preferredName && a.userName.toLowerCase().includes(u.preferredName.toLowerCase())));
 
             let badgeHtml = `<span class="px-2.5 py-1 rounded text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30"><i class="fa-solid fa-hourglass-half mr-1"></i> Pending Verification</span>`;
             if (verified === 'Present') {
@@ -1979,6 +2370,7 @@ class LumaApp {
                         <div class="flex items-center gap-2.5 flex-wrap">
                             <span class="px-3 py-1 bg-sky-600/30 text-sky-300 font-extrabold text-xs rounded-lg border border-sky-500/30">${flight.code}</span>
                             <h4 class="text-base font-bold text-white">${a.userName}</h4>
+                            ${staffUser && staffUser.activityStatus === 'LOA' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-loa flex items-center gap-1 shadow-sm"><i class="fa-solid fa-plane-slash text-[9px]"></i> LOA</span>` : staffUser && staffUser.activityStatus === 'Reduced Activity' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-reduced flex items-center gap-1 shadow-sm"><i class="fa-solid fa-hourglass-half text-[9px]"></i> RA</span>` : ''}
                             ${badgeHtml}
                         </div>
                         <p class="text-xs text-slate-300"><strong>Allocated Duty Role:</strong> <span class="text-sky-400 font-semibold">${a.role}</span> | <strong>Airport:</strong> ${flight.airport}</p>
@@ -2026,57 +2418,159 @@ class LumaApp {
         this.onRealtimeSync();
     }
 
+    selectC4RegisterDay(day) {
+        this.selectedC4Filter = day;
+        this.renderAdminC4Register();
+    }
+
     renderAdminC4Register() {
         const container = document.getElementById('admin-c4-register-list');
+        const selectorBar = document.getElementById('c4-7day-selector-bar');
         if (!container) return;
 
-        const c4List = db.data.consequences.filter(c => ['C4A', 'C4B'].includes(c.level) || c.c4Status);
+        const allC4 = (db.data.consequences || []).filter(c => ['C4A', 'C4B'].includes(c.level) || c.c4Status);
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
 
-        if (c4List.length === 0) {
-            container.innerHTML = `<p class="text-slate-500 text-xs text-center py-8">No C4 Detentions currently logged in the register.</p>`;
+        // Generate rolling 7-day window (Today through Day +6)
+        const next7Days = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            const dateStr = d.toISOString().split('T')[0];
+            const dayName = d.toLocaleDateString('en-GB', { weekday: 'short' });
+            const dayNum = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const label = i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : dayName);
+            const count = allC4.filter(c => c.c4Date === dateStr).length;
+            next7Days.push({ dateStr, dayName, dayNum, label, count, isToday: i === 0 });
+        }
+        const max7DayStr = next7Days[6].dateStr;
+        const pastC4Count = allC4.filter(c => c.c4Date && c.c4Date < todayStr).length;
+        const total7DayCount = allC4.filter(c => (!c.c4Date) || (c.c4Date >= todayStr && c.c4Date <= max7DayStr)).length;
+
+        if (!this.selectedC4Filter) this.selectedC4Filter = 'all';
+
+        // Render 7-Day Day Selector Bar
+        if (selectorBar) {
+            selectorBar.innerHTML = `
+                <button onclick="app.selectC4RegisterDay('all')" class="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    this.selectedC4Filter === 'all'
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-1 ring-rose-400'
+                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }">
+                    <span>All 7 Days</span>
+                    <span class="px-1.5 py-0.2 bg-slate-950/70 rounded-full text-[10px]">${total7DayCount}</span>
+                </button>
+                ${next7Days.map(d => `
+                    <button onclick="app.selectC4RegisterDay('${d.dateStr}')" class="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        this.selectedC4Filter === d.dateStr
+                            ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-1 ring-rose-400'
+                            : (d.isToday ? 'bg-slate-900 text-rose-300 border border-rose-500/40 hover:bg-slate-800' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800')
+                    }">
+                        <span>${d.label} <strong class="font-normal text-[10px] text-slate-300">(${d.dayNum})</strong></span>
+                        ${d.count > 0 ? `<span class="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black">${d.count}</span>` : ''}
+                    </button>
+                `).join('')}
+                ${pastC4Count > 0 ? `
+                    <button onclick="app.selectC4RegisterDay('past')" class="shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        this.selectedC4Filter === 'past'
+                            ? 'bg-slate-700 text-white shadow'
+                            : 'bg-slate-950 text-slate-500 hover:text-slate-300 border border-slate-800'
+                    }">
+                        <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                        <span>Past Archive</span>
+                        <span class="px-1.5 py-0.2 bg-slate-900 rounded-full text-[10px]">${pastC4Count}</span>
+                    </button>
+                ` : ''}
+            `;
+        }
+
+        // Filter detentions according to selected filter
+        let filteredC4 = [];
+        if (this.selectedC4Filter === 'all') {
+            filteredC4 = allC4.filter(c => (!c.c4Date) || (c.c4Date >= todayStr && c.c4Date <= max7DayStr));
+        } else if (this.selectedC4Filter === 'past') {
+            filteredC4 = allC4.filter(c => c.c4Date && c.c4Date < todayStr);
+        } else {
+            filteredC4 = allC4.filter(c => c.c4Date === this.selectedC4Filter);
+        }
+
+        if (filteredC4.length === 0) {
+            container.innerHTML = `<div class="p-8 text-center text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800/80">
+                <i class="fa-solid fa-clipboard-check text-3xl mb-2 text-slate-600"></i>
+                <p>No C4 detentions scheduled for ${this.selectedC4Filter === 'all' ? 'the active 7-day period' : this.selectedC4Filter === 'past' ? 'past days' : this.selectedC4Filter}.</p>
+            </div>`;
             return;
         }
 
-        container.innerHTML = c4List.map(c => {
+        filteredC4.sort((a, b) => {
+            const dA = (a.c4Date || '') + ' ' + (a.c4Time || '');
+            const dB = (b.c4Date || '') + ' ' + (b.c4Time || '');
+            return dA.localeCompare(dB);
+        });
+
+        container.innerHTML = filteredC4.map(c => {
             const targetUser = (db.data.users || []).find(u => u.id === c.userId || (c.userName && u.preferredName && c.userName.toLowerCase().includes(u.preferredName.toLowerCase())));
             const isSuspension = c.c4Status === 'Failed' || c.isSuspension;
             const isExpired = targetUser && targetUser.suspensionUntil && new Date(targetUser.suspensionUntil).getTime() <= Date.now();
             const isActiveSuspension = isSuspension && !c.lifted && targetUser && targetUser.status === 'Suspended' && !isExpired;
+            const isDayPassed = c.c4Date && c.c4Date < todayStr;
 
             return `
-            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
-                <div class="space-y-1">
+            <div class="bg-slate-900 border ${c.c4Status === 'Passed' ? 'border-emerald-500/40 border-l-4 border-l-emerald-500' : c.c4Status === 'Failed' ? 'border-rose-500/40 border-l-4 border-l-rose-500' : 'border-slate-800'} p-5 rounded-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-lg transition-all">
+                <div class="space-y-1.5">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="px-3 py-1 bg-rose-600 text-white font-extrabold text-xs rounded-lg">${c.level}</span>
+                        <span class="px-2.5 py-0.5 bg-rose-600 text-white font-extrabold text-xs rounded-lg">${c.level}</span>
                         <h4 class="text-base font-bold text-white">${c.userName}</h4>
-                        <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                            c.c4Status === 'Passed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                            c.c4Status === 'Failed' ? 'bg-red-600 text-white font-black' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }">${c.c4Status || 'Pending'}</span>
+                        ${targetUser && targetUser.role ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${targetUser.role === 'Head Admin' ? 'badge-head-admin' : targetUser.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'}">${targetUser.role}</span>` : ''}
+                        ${targetUser && targetUser.activityStatus === 'LOA' ? `<span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black rounded">LOA</span>` : targetUser && targetUser.activityStatus === 'Reduced Activity' ? `<span class="px-2 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-black rounded">RA</span>` : ''}
+                        ${c.c4Status === 'Passed' ? `<span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"><i class="fa-solid fa-check"></i> PASSED</span>` : ''}
+                        ${c.c4Status === 'Failed' ? `<span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white flex items-center gap-1"><i class="fa-solid fa-xmark"></i> FAILED</span>` : ''}
+                        ${(!c.c4Status || c.c4Status === 'Pending') ? `<span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/30">Pending Evaluation</span>` : ''}
                         ${isActiveSuspension ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-600 text-white animate-pulse">Active Suspension</span>` : ''}
-                        ${c.lifted ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Suspension Lifted</span>` : ''}
+                        ${c.lifted && !isActiveSuspension ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Suspension Lifted</span>` : ''}
+                        ${isDayPassed ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">Past Day</span>` : ''}
                     </div>
-                    <p class="text-xs text-slate-300"><strong>Scheduled Date & Time:</strong> ${c.c4Date || 'TBD'} @ ${c.c4Time || 'TBD'}</p>
-                    <p class="text-xs text-slate-400"><strong>Location:</strong> ${c.c4Location || 'Training Facility'}</p>
+                    <p class="text-xs text-slate-300">
+                        <strong>Scheduled:</strong> <span class="text-rose-300 font-bold">${c.c4Date || 'TBD'}</span> @ <span class="text-slate-200">${c.c4Time || 'TBD'}</span> | 
+                        <strong>Location:</strong> <span class="text-slate-200">${c.c4Location || 'Training Facility'}</span>
+                    </p>
                     <p class="text-xs text-slate-400"><strong>Reason:</strong> ${c.reason} <span class="text-slate-500">(Issued by ${c.issuedBy})</span></p>
                 </div>
 
-                <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
-                    ${c.c4Status !== 'Passed' ? `
-                    <button onclick="app.evaluateC4('${c.id}', 'Passed')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
-                        <i class="fa-solid fa-check-circle"></i> Mark as Pass
-                    </button>
-                    ` : ''}
-                    ${c.c4Status !== 'Failed' ? `
-                    <button onclick="app.evaluateC4('${c.id}', 'Failed')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
-                        <i class="fa-solid fa-times-circle"></i> Mark as Fail
-                    </button>
-                    ` : ''}
+                <!-- 7-Day Register Highlighted Pass / Fail Controls & Action Buttons -->
+                <div class="flex items-center gap-2.5 w-full lg:w-auto flex-wrap">
+                    <!-- Pass / Fail Dual Switch Highlight Container -->
+                    <div class="flex items-center rounded-xl bg-slate-950 p-1 border border-slate-800 gap-1 shadow-inner">
+                        <!-- PASS SIDE -->
+                        <button onclick="app.evaluateC4('${c.id}', 'Passed')" class="px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            c.c4Status === 'Passed'
+                                ? 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400 scale-[1.02]'
+                                : 'bg-transparent text-slate-400 hover:text-emerald-300 hover:bg-emerald-950/40'
+                        }" title="Pass C4 Detention (Removes from upcoming sanctions & stays on file)">
+                            <i class="fa-solid fa-check"></i>
+                            <span>Pass</span>
+                            ${c.c4Status === 'Passed' ? '<span class="px-1.5 py-0.2 bg-emerald-300 text-slate-950 text-[9px] font-black rounded-full ml-0.5">PASSED</span>' : ''}
+                        </button>
+
+                        <!-- FAIL SIDE -->
+                        <button onclick="app.evaluateC4('${c.id}', 'Failed')" class="px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            c.c4Status === 'Failed'
+                                ? 'bg-rose-600 text-white font-black shadow-lg shadow-rose-500/30 ring-2 ring-rose-400 scale-[1.02]'
+                                : 'bg-transparent text-slate-400 hover:text-rose-300 hover:bg-rose-950/40'
+                        }" title="Fail C4 Detention (Escalates to C4B or 2-Day Suspension)">
+                            <i class="fa-solid fa-xmark"></i>
+                            <span>Fail</span>
+                            ${c.c4Status === 'Failed' ? '<span class="px-1.5 py-0.2 bg-rose-950 text-rose-300 text-[9px] font-black rounded-full ml-0.5">FAILED</span>' : ''}
+                        </button>
+                    </div>
+
                     ${isActiveSuspension ? `
                     <button onclick="app.liftConsequenceSuspension('${c.id}', '${c.userId}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5" title="Lift Suspension (Keeps record on file)">
                         <i class="fa-solid fa-unlock"></i> Lift Suspension
                     </button>
                     ` : ''}
+
                     <button onclick="app.deleteConsequence('${c.id}')" class="px-3 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5" title="Delete Log">
                         <i class="fa-solid fa-trash-can"></i> Delete
                     </button>
@@ -2091,17 +2585,33 @@ class LumaApp {
         if (!res) return;
 
         if (result === 'Passed') {
-            Swal.fire('Detention Cleared!', `Marked C4 detention as PASSED for ${res.csq.userName}.`, 'success');
+            Swal.fire({
+                icon: 'success',
+                title: 'Detention Passed!',
+                text: `Marked C4 detention as PASSED for ${res.csq.userName}. Removed from upcoming sanctions and kept on file.`,
+                confirmButtonColor: '#10b981'
+            });
         } else {
             if (res.action === 'EscalatedToC4B') {
-                Swal.fire('C4A Failed!', `C4A Detention failed. Escalated automatically to C4B (40 Minutes Detention) for ${res.csq.userName}.`, 'warning');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'C4A Failed — Escalated!',
+                    text: `C4A Detention failed. Escalated automatically to C4B (40 Minutes Detention) for ${res.csq.userName}.`,
+                    confirmButtonColor: '#f59e0b'
+                });
             } else if (res.action === 'Suspended2Days') {
-                Swal.fire('C4B Failed - 2-Day Suspension Enforced!', `C4B Detention failed! ${res.csq.userName} has been placed on an automatic 2-Day (48 Hour) Suspension (C5) and locked out of the portal!`, 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'C4B Failed — 2-Day Suspension Enforced!',
+                    text: `C4B Detention failed! ${res.csq.userName} has been placed on an automatic 2-Day (48 Hour) Suspension (C5) and locked out of the portal!`,
+                    confirmButtonColor: '#ef4444'
+                });
             }
         }
 
         this.renderAdminC4Register();
         this.renderAdminRoster();
+        this.onRealtimeSync(true);
     }
 
     populateAdminLogStaffDropdown() {
@@ -2179,43 +2689,119 @@ class LumaApp {
     }
 
     renderAdminRequests() {
-        const container = document.getElementById('admin-requests-list');
-        const pending = db.data.users.filter(u => u.status === 'Pending');
+        const regContainer = document.getElementById('admin-requests-list');
+        const loaContainer = document.getElementById('admin-loa-requests-list');
+        const pendingUsers = (db.data.users || []).filter(u => u.status === 'Pending');
+        const pendingLOAs = (db.data.loaRequests || []).filter(r => r.status === 'Pending');
 
-        if (pending.length === 0) {
-            container.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">No pending staff registration requests.</p>`;
-            return;
+        // Update overall badge count
+        const totalPending = pendingUsers.length + pendingLOAs.length;
+        const countEl = document.getElementById('admin-pending-count');
+        if (countEl) countEl.textContent = totalPending;
+
+        const loaBadge = document.getElementById('admin-pending-loa-count-badge');
+        if (loaBadge) loaBadge.textContent = `${pendingLOAs.length} Pending`;
+
+        const regBadge = document.getElementById('admin-pending-reg-count-badge');
+        if (regBadge) regBadge.textContent = `${pendingUsers.length} Pending`;
+
+        // Render Pending LOA Applications
+        if (loaContainer) {
+            if (pendingLOAs.length === 0) {
+                loaContainer.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">No pending Leave of Absence or Reduced Activity applications.</p>`;
+            } else {
+                loaContainer.innerHTML = pendingLOAs.map(r => `
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md hover:border-amber-500/30 transition-all">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2.5 py-0.5 rounded text-[10px] font-extrabold ${r.type === 'LOA' ? 'badge-loa' : 'badge-reduced'}">${r.type}</span>
+                                <h4 class="text-sm font-bold text-white">${r.userName}</h4>
+                            </div>
+                            <p class="text-xs text-slate-300"><strong>Reason:</strong> ${r.reason}</p>
+                            <p class="text-[11px] text-slate-400">
+                                <i class="fa-solid fa-calendar text-amber-400 mr-1"></i> Requested: <strong>${r.startDate}</strong> to <strong>${r.endDate}</strong>
+                            </p>
+                            <p class="text-[10px] text-slate-500">Submitted: ${new Date(r.submittedDate).toLocaleDateString()}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.approveLOARequest('${r.id}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5">
+                                <i class="fa-solid fa-check"></i> Approve
+                            </button>
+                            <button onclick="app.rejectLOARequest('${r.id}')" class="px-3.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl border border-rose-500/30 transition-all flex items-center gap-1.5">
+                                <i class="fa-solid fa-times"></i> Deny
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
         }
 
-        container.innerHTML = pending.map(u => `
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h4 class="text-sm font-bold text-white">${u.preferredName}</h4>
-                    <p class="text-xs text-slate-400">Roblox: <strong class="text-sky-300">${u.robloxUser}</strong> | Discord: <strong class="text-indigo-300">${u.discordUser}</strong></p>
-                    <p class="text-xs text-slate-500">Email: ${u.email}</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="app.approveStaff('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow">
-                        Accept Staff Member
-                    </button>
-                    <button onclick="app.rejectStaff('${u.id}')" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-lg border border-rose-500/30">
-                        Reject Request
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        // Render Pending User Registrations
+        if (regContainer) {
+            if (pendingUsers.length === 0) {
+                regContainer.innerHTML = `<p class="text-slate-500 text-xs text-center py-6">No pending staff registration requests.</p>`;
+            } else {
+                regContainer.innerHTML = pendingUsers.map(u => `
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h4 class="text-sm font-bold text-white">${u.preferredName}</h4>
+                            <p class="text-xs text-slate-400">Roblox: <strong class="text-sky-300">${u.robloxUser}</strong> | Discord: <strong class="text-indigo-300">${u.discordUser}</strong></p>
+                            <p class="text-xs text-slate-500">Email: ${u.email}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="app.approveStaff('${u.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow">
+                                Accept Staff Member
+                            </button>
+                            <button onclick="app.rejectStaff('${u.id}')" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-lg border border-rose-500/30">
+                                Reject Request
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    }
+
+    approveLOARequest(loaId) {
+        const adminUser = db.currentUser;
+        const res = db.approveLOARequest(loaId, `${adminUser.preferredName} (${adminUser.role})`);
+        if (!res) return;
+        Swal.fire({
+            icon: 'success',
+            title: 'LOA Request Approved!',
+            text: `Approved ${res.req.type} for ${res.req.userName} until ${res.req.endDate}. Status badge now displayed on panel.`,
+            confirmButtonColor: '#10b981'
+        });
+        this.renderAdminPanel();
+        this.onRealtimeSync(true);
+    }
+
+    rejectLOARequest(loaId) {
+        const adminUser = db.currentUser;
+        const req = db.rejectLOARequest(loaId, `${adminUser.preferredName} (${adminUser.role})`);
+        if (!req) return;
+        Swal.fire({
+            icon: 'info',
+            title: 'Request Denied',
+            text: `Denied ${req.type} request for ${req.userName}.`,
+            confirmButtonColor: '#64748b'
+        });
+        this.renderAdminPanel();
+        this.onRealtimeSync(true);
     }
 
     approveStaff(userId) {
         db.approveUser(userId);
         Swal.fire('Staff Approved!', 'User can now log into Luma Oportal.', 'success');
         this.renderAdminPanel();
+        this.onRealtimeSync(true);
     }
 
     rejectStaff(userId) {
         db.rejectUser(userId);
         Swal.fire('Request Rejected', 'Applicant removed from list.', 'info');
         this.renderAdminPanel();
+        this.onRealtimeSync(true);
     }
 
     /**
@@ -2237,6 +2823,7 @@ class LumaApp {
                             <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
                                 u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
                             }">${u.role}</span>
+                            ${u.activityStatus === 'LOA' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-loa flex items-center gap-1 shadow-sm"><i class="fa-solid fa-plane-slash text-[9px]"></i> LOA (${u.loaUntil || 'Active'})</span>` : u.activityStatus === 'Reduced Activity' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-reduced flex items-center gap-1 shadow-sm"><i class="fa-solid fa-hourglass-half text-[9px]"></i> RA (${u.loaUntil || 'Active'})</span>` : ''}
                             ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded flex items-center gap-1"><i class="fa-solid fa-lock text-[9px]"></i> SUSPENDED</span>' : ''}
                         </div>
                         <p class="text-xs text-slate-400 mt-1">Discord: ${u.discordUser} | Email: ${u.email}</p>
@@ -2371,6 +2958,7 @@ class LumaApp {
                                     <span class="px-2 py-0.5 rounded text-[10px] font-extrabold ${
                                         u.role === 'Head Admin' ? 'badge-head-admin' : u.role === 'Admin' ? 'badge-admin' : 'bg-slate-800 text-slate-300'
                                     }">${u.role}</span>
+                                    ${u.activityStatus === 'LOA' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-loa flex items-center gap-1 shadow-sm"><i class="fa-solid fa-plane-slash text-[9px]"></i> LOA (${u.loaUntil || 'Active'})</span>` : u.activityStatus === 'Reduced Activity' ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold badge-reduced flex items-center gap-1 shadow-sm"><i class="fa-solid fa-hourglass-half text-[9px]"></i> RA (${u.loaUntil || 'Active'})</span>` : ''}
                                     ${u.status === 'Suspended' ? '<span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-black rounded">SUSPENDED</span>' : ''}
                                 </div>
                                 <p class="text-[11px] text-slate-400">Email: ${u.email} | Discord: ${u.discordUser}</p>

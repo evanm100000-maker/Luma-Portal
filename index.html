@@ -424,7 +424,7 @@
                 </div>
 
                 <!-- 7. SUPPORT TICKETS -->
-                <div onclick="app.navigateTo('support')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden md:col-span-2 lg:col-span-1">
+                <div onclick="app.navigateTo('support')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
                     <div class="flex items-center justify-between mb-4">
                         <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center text-purple-400 text-xl transition-all duration-300">
                             <i class="fa-solid fa-headset"></i>
@@ -438,6 +438,49 @@
                     </div>
                     <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
                         <span>Open Live Chat</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 8. ACTIVE LOA & REDUCED ACTIVITY -->
+                <div onclick="app.navigateTo('activeloa')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 shadow-lg hover:shadow-amber-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 group-hover:bg-amber-500 group-hover:text-slate-950 flex items-center justify-center text-amber-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-plane-slash"></i>
+                        </div>
+                        <span id="dash-active-loa-badge" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black rounded-lg">0 Active</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">Active LOA / RA</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            View all staff members currently approved on Leave of Absence or Reduced Activity quota exemptions with active dates.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
+                        <span>View Active Exceptions</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+
+                <!-- 9. STAFF DIRECTORY & ONLINE ACTIVITY -->
+                <div onclick="app.navigateTo('staffdirectory')" class="group bg-luma-card hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 shadow-lg hover:shadow-emerald-500/10 transition-all duration-300 cursor-pointer flex flex-col justify-between transform hover:-translate-y-1 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center text-emerald-400 text-xl transition-all duration-300">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <span id="dash-online-count-badge" class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black rounded-lg flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span id="dash-online-count-text">0 Online</span>
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">Staff Directory</h3>
+                        <p class="text-slate-400 text-xs leading-relaxed">
+                            Official organisation staff roster displaying all active team members with real-time green online activity indicators.
+                        </p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
+                        <span>Open Staff Roster</span>
                         <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
                     </div>
                 </div>
@@ -787,6 +830,98 @@
             </div>
         </section>
 
+        <!-- PAGE: ACTIVE LOA & REDUCED ACTIVITY -->
+        <section id="page-activeloa" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-business-time text-amber-400"></i> Active LOA & Reduced Activity
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">Live directory of all staff members currently approved on Leave of Absence or Reduced Activity quota exemptions.</p>
+                </div>
+                <button onclick="app.navigateTo('loa')" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen"></i> Submit LOA Application
+                </button>
+            </div>
+
+            <!-- Tally Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-luma-card border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium">Total on Active Exception</p>
+                        <p id="tally-active-loa-total" class="text-2xl font-black text-white mt-1">0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg">
+                        <i class="fa-solid fa-user-clock"></i>
+                    </div>
+                </div>
+                <div class="bg-luma-card border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium">Full Leave of Absence (0 Flights)</p>
+                        <p id="tally-active-loa-full" class="text-2xl font-black text-amber-400 mt-1">0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg">
+                        <i class="fa-solid fa-plane-slash"></i>
+                    </div>
+                </div>
+                <div class="bg-luma-card border border-slate-800 p-5 rounded-2xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400 font-medium">Reduced Activity (1 Flight/Wk)</p>
+                        <p id="tally-active-loa-ra" class="text-2xl font-black text-sky-400 mt-1">0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 text-lg">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active List Card -->
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-users text-amber-400"></i> Active Exceptions Roster
+                    </h3>
+                    <input type="text" id="activeloa-search-input" oninput="app.renderActiveLOAPage()" placeholder="Search staff name..." class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none w-full sm:w-64">
+                </div>
+                <div id="activeloa-list-container" class="space-y-3">
+                    <!-- Populated dynamically by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE: STAFF TEAM DIRECTORY & ONLINE ACTIVITY -->
+        <section id="page-staffdirectory" class="hidden space-y-6 animate-fade-in">
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <i class="fa-solid fa-users text-emerald-400"></i> Staff Directory & Online Activity
+                    </h2>
+                    <p class="text-slate-400 text-xs mt-1">Live overview of all official staff members with real-time online activity status (green active indicators).</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="staff-online-counter-badge" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> <span id="staff-online-count-number">0</span> Online Now
+                    </span>
+                </div>
+            </div>
+
+            <!-- Filter & Search Bar -->
+            <div class="bg-luma-card border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-lg">
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                    <button onclick="app.setStaffDirectoryFilter('all')" id="staff-filter-all" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow">All Staff</button>
+                    <button onclick="app.setStaffDirectoryFilter('online')" id="staff-filter-online" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-400 hover:text-white border border-slate-800">Online Only</button>
+                    <button onclick="app.setStaffDirectoryFilter('admin')" id="staff-filter-admin" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-400 hover:text-white border border-slate-800">Admins</button>
+                    <button onclick="app.setStaffDirectoryFilter('staff')" id="staff-filter-staff" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-slate-400 hover:text-white border border-slate-800">Flight Staff</button>
+                </div>
+                <input type="text" id="staff-directory-search" oninput="app.renderStaffDirectoryPage()" placeholder="Search staff by name or Roblox..." class="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 outline-none w-full sm:w-72">
+            </div>
+
+            <!-- Staff Grid -->
+            <div id="staff-directory-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Rendered dynamically by JS -->
+            </div>
+        </section>
+
         <!-- PAGE 8: ADMIN PANEL (PARENT HUB) -->
         <section id="page-admin" class="hidden space-y-6 animate-fade-in">
             <!-- Admin Header -->
@@ -847,9 +982,22 @@
 
             <!-- ADMIN TAB 1: STAFF REQUESTS -->
             <div id="admin-section-requests" class="space-y-4">
+                <!-- Subsection 1: Pending LOA & Reduced Activity Applications -->
                 <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
                     <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
-                        <span><i class="fa-solid fa-user-plus text-amber-400 mr-2"></i> Pending Registration Approval Requests</span>
+                        <span><i class="fa-solid fa-business-time text-amber-400 mr-2"></i> Pending Leave of Absence (LOA) & Reduced Activity Requests</span>
+                        <span id="admin-pending-loa-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">0 Pending</span>
+                    </h3>
+                    <div id="admin-loa-requests-list" class="space-y-3">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Subsection 2: Pending Registration Approval Requests -->
+                <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-user-plus text-sky-400 mr-2"></i> Pending Registration Approval Requests</span>
+                        <span id="admin-pending-reg-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">0 Pending</span>
                     </h3>
                     <div id="admin-requests-list" class="space-y-3">
                         <!-- Rendered by JS -->
@@ -872,15 +1020,23 @@
                 </div>
             </div>
 
-            <!-- ADMIN TAB: C4 DETENTION REGISTER -->
+            <!-- ADMIN TAB: C4 DETENTION REGISTER (7-DAY VIEW) -->
             <div id="admin-section-c4register" class="hidden space-y-4">
                 <div class="bg-luma-card border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                    <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-3 flex items-center justify-between">
-                        <span><i class="fa-solid fa-clipboard-check text-rose-400 mr-2"></i> C4 Detention Register & Pass/Fail Evaluation Desk</span>
-                        <span class="text-xs text-rose-300 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-lg">
-                            <i class="fa-solid fa-triangle-exclamation mr-1"></i> C4A Fail &rarr; C4B | C4B Fail &rarr; 2-Day Suspension
-                        </span>
-                    </h3>
+                    <div class="border-b border-slate-800 pb-4 space-y-3">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-calendar-week text-rose-400"></i> 7-Day C4 Detention Register & Evaluation
+                            </h3>
+                            <span class="text-xs text-rose-300 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
+                                <i class="fa-solid fa-triangle-exclamation"></i> C4A Fail &rarr; C4B | C4B Fail &rarr; 2-Day Suspension
+                            </span>
+                        </div>
+                        <!-- 7-Day Day Selector Bar -->
+                        <div id="c4-7day-selector-bar" class="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
                     <div id="admin-c4-register-list" class="space-y-4">
                         <!-- Rendered by JS -->
                     </div>

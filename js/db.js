@@ -514,6 +514,7 @@ class LumaDB {
     // --- LOA & REDUCED ACTIVITY METHODS ---
 
     submitLOARequest(requestData) {
+        const isAdmin = requestData.isAdmin === true;
         const newReq = {
             id: 'loa_' + Date.now(),
             userId: requestData.userId,
@@ -522,20 +523,62 @@ class LumaDB {
             startDate: requestData.startDate,
             endDate: requestData.endDate,
             reason: requestData.reason,
-            status: 'Approved', // Auto approved or admin review
+            status: isAdmin ? 'Approved' : 'Pending', // Normal staff submit as Pending for Admin Panel approval!
             submittedDate: new Date().toISOString()
         };
 
-        // Apply immediately to user profile
-        const user = this.data.users.find(u => u.id === requestData.userId);
-        if (user) {
-            user.activityStatus = requestData.type;
-            user.loaUntil = requestData.endDate;
+        // If admin submitted or forced, apply immediately
+        if (isAdmin) {
+            const user = this.data.users.find(u => u.id === requestData.userId);
+            if (user) {
+                user.activityStatus = requestData.type;
+                user.loaUntil = requestData.endDate;
+            }
         }
 
         this.data.loaRequests.push(newReq);
         this.save();
         return newReq;
+    }
+
+    approveLOARequest(loaId, adminName) {
+        const req = (this.data.loaRequests || []).find(r => r.id === loaId);
+        if (!req) return null;
+        req.status = 'Approved';
+        req.approvedBy = adminName;
+        req.approvedAt = new Date().toISOString();
+
+        const user = (this.data.users || []).find(u => u.id === req.userId);
+        if (user) {
+            user.activityStatus = req.type;
+            user.loaUntil = req.endDate;
+        }
+
+        this.save();
+        return { req, user };
+    }
+
+    rejectLOARequest(loaId, adminName) {
+        const req = (this.data.loaRequests || []).find(r => r.id === loaId);
+        if (!req) return null;
+        req.status = 'Rejected';
+        req.rejectedBy = adminName;
+        req.rejectedAt = new Date().toISOString();
+
+        this.save();
+        return req;
+    }
+
+    touchUserActivity(userId) {
+        if (!userId) return;
+        const user = (this.data.users || []).find(u => u.id === userId);
+        if (!user) return;
+        const now = Date.now();
+        // Update heartbeat (throttle to once every 15s to prevent excessive Firebase writes)
+        if (!user.lastActiveAt || (now - user.lastActiveAt > 15000)) {
+            user.lastActiveAt = now;
+            this.save();
+        }
     }
 
     forceLOA(userId, type, endDate, reason = 'Admin Action') {
@@ -607,6 +650,12 @@ class LumaDB {
 
         if (result === 'Passed') {
             csq.c4Status = 'Passed';
+            csq.lifted = true;
+            if (user && user.status === 'Suspended' && csq.level === 'C4B') {
+                user.status = 'Approved';
+                user.suspensionUntil = null;
+                user.suspensionReason = null;
+            }
             this.save();
             return { action: 'Passed', csq, user };
         } else if (result === 'Failed') {
@@ -614,7 +663,7 @@ class LumaDB {
                 // Fail C4A -> Escalate to C4B (40 Mins Detention)
                 csq.level = 'C4B';
                 csq.c4Status = 'Pending';
-                csq.reason = csq.reason + ' [C4A Failed -> Escalated to C4B]';
+                csq.reason = csq.reason.includes('[C4A Failed') ? csq.reason : (csq.reason + ' [C4A Failed -> Escalated to C4B]');
                 this.save();
                 return { action: 'EscalatedToC4B', csq, user };
             } else if (csq.level === 'C4B') {
